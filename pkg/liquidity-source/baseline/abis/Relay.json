@@ -1,0 +1,117 @@
+[
+  {
+    "type": "event",
+    "name": "PoolCreated",
+    "inputs": [
+      { "name": "bTokenAddress", "type": "address", "indexed": false },
+      { "name": "reserveAddress", "type": "address", "indexed": false },
+      { "name": "creator", "type": "address", "indexed": false },
+      { "name": "feeRecipient", "type": "address", "indexed": false },
+      { "name": "creatorFeePct", "type": "uint256", "indexed": false },
+      { "name": "initialActivePrice", "type": "uint256", "indexed": false },
+      { "name": "initialBlvPrice", "type": "uint256", "indexed": false },
+      { "name": "totalReserves", "type": "uint256", "indexed": false },
+      { "name": "totalBTokens", "type": "uint256", "indexed": false },
+      { "name": "totalCollateral", "type": "uint256", "indexed": false },
+      { "name": "totalDebt", "type": "uint256", "indexed": false },
+      { "name": "poolId", "type": "bytes32", "indexed": false }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "function",
+    "name": "reserve",
+    "inputs": [
+      { "name": "_bToken", "type": "address", "internalType": "contract BToken" }
+    ],
+    "outputs": [
+      { "name": "", "type": "address", "internalType": "contract ERC20" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalReserves",
+    "inputs": [
+      { "name": "_bToken", "type": "address", "internalType": "contract BToken" }
+    ],
+    "outputs": [
+      { "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalBTokens",
+    "inputs": [
+      { "name": "_bToken", "type": "address", "internalType": "contract BToken" }
+    ],
+    "outputs": [
+      { "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalSupply",
+    "inputs": [
+      { "name": "_bToken", "type": "address", "internalType": "contract BToken" }
+    ],
+    "outputs": [
+      { "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "quoteBuyExactIn",
+    "inputs": [
+      { "name": "_bToken", "type": "address", "internalType": "contract BToken" },
+      { "name": "_reservesIn", "type": "uint256" }
+    ],
+    "outputs": [
+      { "name": "tokensOut_", "type": "uint256" },
+      { "name": "feesReceived_", "type": "uint256" },
+      { "name": "slippage_", "type": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "quoteSellExactIn",
+    "inputs": [
+      { "name": "_bToken", "type": "address", "internalType": "contract BToken" },
+      { "name": "_amountIn", "type": "uint256" }
+    ],
+    "outputs": [
+      { "name": "amountOut_", "type": "uint256" },
+      { "name": "feesReceived_", "type": "uint256" },
+      { "name": "slippage_", "type": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCurveParams",
+    "inputs": [
+      { "name": "_bToken", "type": "address", "internalType": "contract BToken" }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          { "name": "BLV", "type": "uint256" },
+          { "name": "circ", "type": "uint256" },
+          { "name": "supply", "type": "uint256" },
+          { "name": "swapFee", "type": "uint256" },
+          { "name": "reserves", "type": "uint256" },
+          { "name": "totalSupply", "type": "uint256" },
+          { "name": "convexityExp", "type": "uint256" },
+          { "name": "lastInvariant", "type": "uint256" }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  }
+]
