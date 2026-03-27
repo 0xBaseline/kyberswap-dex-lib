@@ -18,12 +18,12 @@ import (
 type BeforeSwapParams struct {
 	CalcOut         bool
 	ZeroForOne      bool
-	AmountSpecified *big.Int
+	AmountSpecified *big.Int // CalcOut: amountIn; CalcIn: amountOut
 }
 
 type BeforeSwapResult struct {
-	DeltaSpecified   *big.Int // in -= specified
-	DeltaUnspecified *big.Int // out -= unspecified
+	DeltaSpecified   *big.Int // CalcOut: in -= specified   ; CalcIn: out += specified
+	DeltaUnspecified *big.Int // CalcOut: out -= unspecified; CalcIn: in += unspecified
 	SwapFee          FeeAmount
 	Gas              int64
 	SwapInfo         any
@@ -41,7 +41,7 @@ func ValidateBeforeSwapResult(result *BeforeSwapResult) error {
 }
 
 type AfterSwapResult struct {
-	HookFee *big.Int
+	HookFee *big.Int // CalcOut: out -= hook fee; CalcIn: in += hook fee
 	Gas     int64
 }
 

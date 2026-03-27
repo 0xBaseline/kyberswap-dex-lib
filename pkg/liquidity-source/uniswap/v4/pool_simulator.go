@@ -253,7 +253,6 @@ func (p *PoolSimulator) CalcAmountIn(param pool.CalcAmountInParams) (swapResult 
 			}
 		}
 	}
-
 	if p.GetTokenIndex(param.TokenIn) == -1 {
 		for _, wrapper := range p.tokenWrappers {
 			metadata, canUnwrap := wrapper.CanWrap(p.chainID, param.TokenIn)
