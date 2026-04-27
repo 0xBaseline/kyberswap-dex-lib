@@ -2,7 +2,6 @@ package baseline
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"os"
 	"testing"
@@ -16,19 +15,47 @@ import (
 	graphqlpkg "github.com/KyberNetwork/kyberswap-dex-lib/pkg/util/graphql"
 )
 
-func skipIfNoEnv(t *testing.T) (rpcURL, graphqlURL, relayAddr string) {
+const (
+	mainnetRelay = "0xc81Fd894C0acE037d133aF4886550aC8133568E8"
+	mainnetWETH  = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+	mainnetB     = "0x9fdbde76236998dc2836fe67a9954ede456a1d63"
+)
+
+func skipIfNoRPC(t *testing.T) string {
+	t.Helper()
+	rpcURL := os.Getenv("ETH_RPC_URL")
+	if rpcURL == "" {
+		t.Skip("Set ETH_RPC_URL to run live tests")
+	}
+	return rpcURL
+}
+
+func skipIfNoSubgraph(t *testing.T) (rpcURL, graphqlURL, relayAddr string) {
 	t.Helper()
 	rpcURL = os.Getenv("BASELINE_RPC_URL")
 	graphqlURL = os.Getenv("BASELINE_GRAPHQL_URL")
 	relayAddr = os.Getenv("BASELINE_RELAY_ADDRESS")
 	if rpcURL == "" || graphqlURL == "" || relayAddr == "" {
-		t.Skip("Set BASELINE_RPC_URL, BASELINE_GRAPHQL_URL, and BASELINE_RELAY_ADDRESS to run live tests")
+		t.Skip("Set BASELINE_RPC_URL, BASELINE_GRAPHQL_URL, and BASELINE_RELAY_ADDRESS to run subgraph tests")
 	}
 	return
 }
 
+func newMainnetPool() entity.Pool {
+	return entity.Pool{
+		Address:  mainnetB,
+		Exchange: "baseline",
+		Type:     DexType,
+		Reserves: entity.PoolReserves{"0", "0"},
+		Tokens: []*entity.PoolToken{
+			{Address: mainnetWETH, Decimals: 18, Symbol: "WETH", Swappable: true},
+			{Address: mainnetB, Decimals: 18, Symbol: "B", Swappable: true},
+		},
+	}
+}
+
 func TestPoolsListUpdater_GetNewPools(t *testing.T) {
-	rpcURL, graphqlURL, relayAddr := skipIfNoEnv(t)
+	rpcURL, graphqlURL, relayAddr := skipIfNoSubgraph(t)
 
 	ethrpcClient := ethrpc.New(rpcURL)
 	ethrpcClient.SetMulticallContract(common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"))
@@ -37,7 +64,7 @@ func TestPoolsListUpdater_GetNewPools(t *testing.T) {
 
 	cfg := &Config{
 		DexID:        "baseline",
-		ChainID:      84532,
+		ChainID:      1,
 		RelayAddress: relayAddr,
 		NewPoolLimit: 10,
 	}
@@ -57,15 +84,15 @@ func TestPoolsListUpdater_GetNewPools(t *testing.T) {
 }
 
 func TestPoolTracker_GetNewPoolState(t *testing.T) {
-	rpcURL, _, relayAddr := skipIfNoEnv(t)
+	rpcURL := skipIfNoRPC(t)
 
 	ethrpcClient := ethrpc.New(rpcURL)
 	ethrpcClient.SetMulticallContract(common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"))
 
 	cfg := &Config{
 		DexID:        "baseline",
-		ChainID:      84532,
-		RelayAddress: relayAddr,
+		ChainID:      1,
+		RelayAddress: mainnetRelay,
 	}
 
 	tracker, err := NewPoolTracker(cfg, ethrpcClient)
@@ -73,18 +100,7 @@ func TestPoolTracker_GetNewPoolState(t *testing.T) {
 		t.Fatalf("NewPoolTracker failed: %v", err)
 	}
 
-	testPool := entity.Pool{
-		Address:  "0x39eeaf94bb996c5e19ae51eae392a11c5e7b6b84",
-		Exchange: "baseline",
-		Type:     DexType,
-		Reserves: entity.PoolReserves{"0", "0"},
-		Tokens: []*entity.PoolToken{
-			{Address: "0xb85885897d297000a74ea2e4711c3ca729461abc", Decimals: 18, Symbol: "WETH", Swappable: true},
-			{Address: "0x39eeaf94bb996c5e19ae51eae392a11c5e7b6b84", Decimals: 18, Symbol: "TB5", Swappable: true},
-		},
-	}
-
-	updated, err := tracker.GetNewPoolState(context.Background(), testPool, pool.GetNewPoolStateParams{})
+	updated, err := tracker.GetNewPoolState(context.Background(), newMainnetPool(), pool.GetNewPoolStateParams{})
 	if err != nil {
 		t.Fatalf("GetNewPoolState failed: %v", err)
 	}
@@ -96,24 +112,27 @@ func TestPoolTracker_GetNewPoolState(t *testing.T) {
 		t.Fatalf("Failed to unmarshal extra: %v", err)
 	}
 
-	if extra.BuyRate[0] != nil {
-		t.Logf("Buy rate: %s -> %s", extra.BuyRate[0], extra.BuyRate[1])
+	if extra.BuyRate[0] == nil || extra.BuyRate[0].IsZero() {
+		t.Fatal("BuyRate not populated")
 	}
-	if extra.SellRate[0] != nil {
-		t.Logf("Sell rate: %s -> %s", extra.SellRate[0], extra.SellRate[1])
+	if extra.SellRate[0] == nil || extra.SellRate[0].IsZero() {
+		t.Fatal("SellRate not populated")
 	}
+
+	t.Logf("Buy rate: %s -> %s", extra.BuyRate[0], extra.BuyRate[1])
+	t.Logf("Sell rate: %s -> %s", extra.SellRate[0], extra.SellRate[1])
 }
 
-func TestPoolSimulator_CalcAmountOut(t *testing.T) {
-	rpcURL, _, relayAddr := skipIfNoEnv(t)
+func TestCalcAmountOut_BuyPopulatesAmountOut(t *testing.T) {
+	rpcURL := skipIfNoRPC(t)
 
 	ethrpcClient := ethrpc.New(rpcURL)
 	ethrpcClient.SetMulticallContract(common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"))
 
 	cfg := &Config{
 		DexID:        "baseline",
-		ChainID:      84532,
-		RelayAddress: relayAddr,
+		ChainID:      1,
+		RelayAddress: mainnetRelay,
 	}
 
 	tracker, err := NewPoolTracker(cfg, ethrpcClient)
@@ -121,18 +140,7 @@ func TestPoolSimulator_CalcAmountOut(t *testing.T) {
 		t.Fatalf("NewPoolTracker failed: %v", err)
 	}
 
-	testPool := entity.Pool{
-		Address:  "0x39eeaf94bb996c5e19ae51eae392a11c5e7b6b84",
-		Exchange: "baseline",
-		Type:     DexType,
-		Reserves: entity.PoolReserves{"0", "0"},
-		Tokens: []*entity.PoolToken{
-			{Address: "0xb85885897d297000a74ea2e4711c3ca729461abc", Decimals: 18, Symbol: "WETH", Swappable: true},
-			{Address: "0x39eeaf94bb996c5e19ae51eae392a11c5e7b6b84", Decimals: 18, Symbol: "TB5", Swappable: true},
-		},
-	}
-
-	updated, err := tracker.GetNewPoolState(context.Background(), testPool, pool.GetNewPoolStateParams{})
+	updated, err := tracker.GetNewPoolState(context.Background(), newMainnetPool(), pool.GetNewPoolStateParams{})
 	if err != nil {
 		t.Fatalf("GetNewPoolState failed: %v", err)
 	}
@@ -142,30 +150,94 @@ func TestPoolSimulator_CalcAmountOut(t *testing.T) {
 		t.Fatalf("NewPoolSimulator failed: %v", err)
 	}
 
-	// Test buy: 0.01 WETH -> TB5
+	// Buy: 0.01 WETH -> $B
 	result, err := sim.CalcAmountOut(pool.CalcAmountOutParams{
 		TokenAmountIn: pool.TokenAmount{
-			Token:  "0xb85885897d297000a74ea2e4711c3ca729461abc",
+			Token:  mainnetWETH,
 			Amount: big.NewInt(1e16),
 		},
-		TokenOut: "0x39eeaf94bb996c5e19ae51eae392a11c5e7b6b84",
+		TokenOut: mainnetB,
 	})
 	if err != nil {
 		t.Fatalf("CalcAmountOut (buy) failed: %v", err)
 	}
-	t.Logf("Buy: 0.01 WETH -> %s TB5", result.TokenAmountOut.Amount)
 
-	// Test sell: 1 TB5 -> WETH
-	result, err = sim.CalcAmountOut(pool.CalcAmountOutParams{
+	swapInfo, ok := result.SwapInfo.(SwapInfo)
+	if !ok {
+		t.Fatal("SwapInfo is not of type SwapInfo")
+	}
+
+	if !swapInfo.IsBuy {
+		t.Fatal("expected IsBuy to be true for reserve -> bToken")
+	}
+
+	if swapInfo.AmountOut == "" {
+		t.Fatal("SwapInfo.AmountOut must be populated for buys (needed for efficient buyTokensExactOut path)")
+	}
+
+	amountOut, ok := new(big.Int).SetString(swapInfo.AmountOut, 10)
+	if !ok {
+		t.Fatalf("SwapInfo.AmountOut is not a valid decimal string: %q", swapInfo.AmountOut)
+	}
+
+	if amountOut.Cmp(result.TokenAmountOut.Amount) != 0 {
+		t.Fatalf("SwapInfo.AmountOut (%s) != TokenAmountOut.Amount (%s)", amountOut, result.TokenAmountOut.Amount)
+	}
+
+	t.Logf("Buy: 0.01 WETH -> %s $B (AmountOut in SwapInfo: %s)", result.TokenAmountOut.Amount, swapInfo.AmountOut)
+}
+
+func TestCalcAmountOut_SellOmitsAmountOut(t *testing.T) {
+	rpcURL := skipIfNoRPC(t)
+
+	ethrpcClient := ethrpc.New(rpcURL)
+	ethrpcClient.SetMulticallContract(common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"))
+
+	cfg := &Config{
+		DexID:        "baseline",
+		ChainID:      1,
+		RelayAddress: mainnetRelay,
+	}
+
+	tracker, err := NewPoolTracker(cfg, ethrpcClient)
+	if err != nil {
+		t.Fatalf("NewPoolTracker failed: %v", err)
+	}
+
+	updated, err := tracker.GetNewPoolState(context.Background(), newMainnetPool(), pool.GetNewPoolStateParams{})
+	if err != nil {
+		t.Fatalf("GetNewPoolState failed: %v", err)
+	}
+
+	sim, err := NewPoolSimulator(updated)
+	if err != nil {
+		t.Fatalf("NewPoolSimulator failed: %v", err)
+	}
+
+	// Sell: 1000 $B -> WETH
+	result, err := sim.CalcAmountOut(pool.CalcAmountOutParams{
 		TokenAmountIn: pool.TokenAmount{
-			Token:  "0x39eeaf94bb996c5e19ae51eae392a11c5e7b6b84",
-			Amount: big.NewInt(1e18),
+			Token:  mainnetB,
+			Amount: new(big.Int).Mul(big.NewInt(1000), big.NewInt(1e18)),
 		},
-		TokenOut: "0xb85885897d297000a74ea2e4711c3ca729461abc",
+		TokenOut: mainnetWETH,
 	})
 	if err != nil {
-		fmt.Printf("CalcAmountOut (sell) failed: %v\n", err)
-	} else {
-		t.Logf("Sell: 1 TB5 -> %s WETH", result.TokenAmountOut.Amount)
+		t.Fatalf("CalcAmountOut (sell) failed: %v", err)
 	}
+
+	swapInfo, ok := result.SwapInfo.(SwapInfo)
+	if !ok {
+		t.Fatal("SwapInfo is not of type SwapInfo")
+	}
+
+	if swapInfo.IsBuy {
+		t.Fatal("expected IsBuy to be false for bToken -> reserve")
+	}
+
+	if swapInfo.AmountOut != "" {
+		t.Fatalf("SwapInfo.AmountOut should be empty for sells, got: %s", swapInfo.AmountOut)
+	}
+
+	t.Logf("Sell: 1000 $B -> %s WETH (AmountOut correctly omitted)", result.TokenAmountOut.Amount)
 }
