@@ -108,6 +108,14 @@ func SNeg(i *uint256.Int) *int256.Int {
 	return new(int256.Int).Neg((*int256.Int)(i))
 }
 
+func SFloat64(i *int256.Int) float64 {
+	if i.IsPositive() {
+		return ((*uint256.Int)(i)).Float64()
+	}
+	var tmp int256.Int
+	return -(*uint256.Int)(tmp.Neg(i)).Float64()
+}
+
 func NewUint256(s string) (res *uint256.Int, err error) {
 	res = new(uint256.Int)
 	err = res.SetFromDecimal(s)
@@ -144,20 +152,20 @@ func MustFromInt64(x int64) *uint256.Int {
 }
 
 func Cap(n *uint256.Int, min *uint256.Int, max *uint256.Int) *uint256.Int {
-	if n.Cmp(min) <= 0 {
+	if !n.Gt(min) {
 		return new(uint256.Int).Add(min, U1)
 	}
-	if n.Cmp(max) >= 0 {
+	if !n.Lt(max) {
 		return new(uint256.Int).Sub(max, U1)
 	}
 	return n
 }
 
 func CapPriceLimit(priceLimit *uint256.Int) *uint256.Int {
-	if priceLimit.Cmp(MinSqrtRatio) <= 0 {
+	if !priceLimit.Gt(MinSqrtRatio) {
 		return priceLimit.AddUint64(MinSqrtRatio, 1)
 	}
-	if priceLimit.Cmp(MaxSqrtRatio) >= 0 {
+	if !priceLimit.Lt(MaxSqrtRatio) {
 		return priceLimit.SubUint64(MaxSqrtRatio, 1)
 	}
 	return priceLimit
@@ -167,7 +175,7 @@ func CapPriceLimit(priceLimit *uint256.Int) *uint256.Int {
 func Min(a, b *uint256.Int) *uint256.Int {
 	if a == nil || b == nil {
 		return nil
-	} else if a.Cmp(b) < 0 {
+	} else if a.Lt(b) {
 		return a
 	}
 	return b
@@ -177,10 +185,18 @@ func Min(a, b *uint256.Int) *uint256.Int {
 func Max(a, b *uint256.Int) *uint256.Int {
 	if a == nil || b == nil {
 		return nil
-	} else if a.Cmp(b) > 0 {
+	} else if a.Gt(b) {
 		return a
 	}
 	return b
+}
+
+func DivUp(x, y *uint256.Int) *uint256.Int {
+	var q, rem uint256.Int
+	if q.DivMod(x, y, &rem); !rem.IsZero() {
+		q.AddUint64(&q, 1)
+	}
+	return &q
 }
 
 // MulDivUp multiplies x and y, then divides by denominator, rounding up, and stores the result in res.

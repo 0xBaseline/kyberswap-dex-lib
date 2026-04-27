@@ -8,6 +8,7 @@ import (
 	"github.com/KyberNetwork/ethrpc"
 	"github.com/KyberNetwork/uniswapv3-sdk-uint256/constants"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/goccy/go-json"
 
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/entity"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/util/bignumber"
@@ -15,14 +16,14 @@ import (
 )
 
 type BeforeSwapParams struct {
-	ExactIn         bool
+	CalcOut         bool
 	ZeroForOne      bool
-	AmountSpecified *big.Int
+	AmountSpecified *big.Int // CalcOut: amountIn; CalcIn: amountOut
 }
 
 type BeforeSwapResult struct {
-	DeltaSpecified   *big.Int
-	DeltaUnspecified *big.Int
+	DeltaSpecified   *big.Int // CalcOut: in -= specified   ; CalcIn: out += specified
+	DeltaUnspecified *big.Int // CalcOut: out -= unspecified; CalcIn: in += unspecified
 	SwapFee          FeeAmount
 	Gas              int64
 	SwapInfo         any
@@ -30,22 +31,17 @@ type BeforeSwapResult struct {
 
 func ValidateBeforeSwapResult(result *BeforeSwapResult) error {
 	if result == nil {
-		return errors.New("before swap result is nil")
+		return ErrNilBeforeSwapResult
+	} else if result.DeltaSpecified == nil {
+		return ErrNilDeltaSpecified
+	} else if result.DeltaUnspecified == nil {
+		return ErrNilDeltaUnspecified
 	}
-
-	if result.DeltaSpecified == nil {
-		return errors.New("delta specified is nil")
-	}
-
-	if result.DeltaUnspecified == nil {
-		return errors.New("delta unspecified is nil")
-	}
-
 	return nil
 }
 
 type AfterSwapResult struct {
-	HookFee *big.Int
+	HookFee *big.Int // CalcOut: out -= hook fee; CalcIn: in += hook fee
 	Gas     int64
 }
 
@@ -108,8 +104,9 @@ func HasSwapPermissions(address common.Address) bool {
 
 type Hook interface {
 	GetExchange() string
+	AllowEmptyTicks() bool
 	GetReserves(context.Context, *HookParam) (entity.PoolReserves, error)
-	Track(context.Context, *HookParam) (string, error)
+	Track(context.Context, *HookParam) (json.RawMessage, error)
 	BeforeSwap(params *BeforeSwapParams) (*BeforeSwapResult, error)
 	AfterSwap(params *AfterSwapParams) (*AfterSwapResult, error)
 	CanBeforeSwap(address common.Address) bool
@@ -123,9 +120,25 @@ type HookParam struct {
 	Cfg         *Config
 	RpcClient   *ethrpc.Client
 	Pool        *entity.Pool
-	HookExtra   string
+	HookExtra   HookExtra
 	HookAddress common.Address
 	BlockNumber *big.Int
+}
+
+type HookExtra json.RawMessage
+
+func (x HookExtra) Unmarshal(dest any) error {
+	if len(x) == 0 {
+		return ErrEmptyExtra
+	}
+	if x[0] == '"' { // backwards-compatibility
+		var unescaped string
+		if err := json.Unmarshal(x, &unescaped); err != nil {
+			return err
+		}
+		return json.Unmarshal([]byte(unescaped), dest)
+	}
+	return json.Unmarshal(x, dest)
 }
 
 type HookFactory func(param *HookParam) Hook
@@ -168,12 +181,16 @@ func (h *BaseHook) GetExchange() string {
 	return DexType
 }
 
+func (h *BaseHook) AllowEmptyTicks() bool {
+	return false
+}
+
 func (h *BaseHook) GetReserves(context.Context, *HookParam) (entity.PoolReserves, error) {
 	return nil, nil
 }
 
-func (h *BaseHook) Track(context.Context, *HookParam) (string, error) {
-	return "", nil
+func (h *BaseHook) Track(context.Context, *HookParam) (json.RawMessage, error) {
+	return nil, nil
 }
 
 func (h *BaseHook) BeforeSwap(_ *BeforeSwapParams) (*BeforeSwapResult, error) {

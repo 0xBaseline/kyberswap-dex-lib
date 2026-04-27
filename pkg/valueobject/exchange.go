@@ -54,6 +54,7 @@ const (
 	ExchangeBurrBearComposableStable   = "burrbear-composable-stable"
 	ExchangeBurrBearStable             = "burrbear-stable"
 	ExchangeBurrBearWeighted           = "burrbear-weighted"
+	ExchangeCanonic                    = "canonic"
 	ExchangeCarbon                     = "carbon"
 	ExchangeClear                      = "clear"
 	ExchangeClipper                    = "clipper"
@@ -82,6 +83,7 @@ const (
 	ExchangeDodoClassical              = "dodo-classical"
 	ExchangeDodoPrivatePool            = "dodo-dpp"
 	ExchangeDodoStablePool             = "dodo-dsp"
+	ExchangeDodoGasSavingPool          = "dodo-gsp"
 	ExchangeDodoVendingMachine         = "dodo-dvm"
 	ExchangeDystopia                   = "dystopia"
 	ExchangeEkubo                      = "ekubo"
@@ -100,10 +102,12 @@ const (
 	ExchangeEulerSwap                  = "euler-swap"
 	ExchangeEulerSwapV2                = "euler-swap-v2"
 	ExchangeFakePool                   = "fake-pool"
+	ExchangeFeltir                     = "feltir"
 	ExchangeFluidDexLite               = "fluid-dex-lite"
 	ExchangeFluidDexT1                 = "fluid-dex-t1"
 	ExchangeFluidDexV2                 = "fluid-dex-v2"
 	ExchangeFluidVaultT1               = "fluid-vault-t1"
+	ExchangeFluidATokenSwap            = "fluid-atoken-swap"
 	ExchangeFrxETH                     = "frxeth"
 	ExchangeFrxUSD                     = "frxusd"
 	ExchangeGenericArm                 = "generic-arm"
@@ -113,6 +117,7 @@ const (
 	ExchangeGyroscope3CLP              = "gyroscope-3clp"
 	ExchangeGyroscopeECLP              = "gyroscope-eclp"
 	ExchangeHashflowV3                 = "hashflow-v3"
+	ExchangeHiddenOcean                = "hidden-ocean"
 	ExchangeHoney                      = "honey"
 	ExchangeHyeth                      = "hyeth"
 	ExchangeHyperpieV2                 = "hyperpie-v2"
@@ -137,6 +142,7 @@ const (
 	ExchangeListaStable                = "lista-stable"
 	ExchangeLitePSM                    = "lite-psm"
 	ExchangeLO1inch                    = "lo1inch"
+	ExchangeLunarBase                  = "lunarbase"
 	ExchangeMakerLido                  = "lido"
 	ExchangeMakerLidoStETH             = "lido-steth"
 	ExchangeMakerPSM                   = "maker-psm"
@@ -153,6 +159,7 @@ const (
 	ExchangeMiroMigrator               = "miro-migrator"
 	ExchangeMkrSky                     = "mkr-sky"
 	ExchangeMMF                        = "mmf"
+	ExchangeMooniswap                  = "mooniswap"
 	ExchangeMorpheus                   = "morpheus"
 	ExchangeMuteSwitch                 = "muteswitch"
 	ExchangeNabla                      = "nabla"
@@ -161,6 +168,7 @@ const (
 	ExchangeNativeV2                   = "native-v2"
 	ExchangeNativeV3                   = "native-v3"
 	ExchangeNomiswap                   = "nomiswap"
+	ExchangeObric                      = "obric"
 	ExchangeOETH                       = "oeth"
 	ExchangeOmniBin                    = "omni-bin"
 	ExchangeOmniCL                     = "omni-cl"
@@ -191,9 +199,14 @@ const (
 	ExchangePmm4                       = "pmm-4"
 	ExchangePmm5                       = "pmm-5"
 	ExchangePmm6                       = "pmm-6"
+	ExchangePmm7                       = "pmm-7"
+	ExchangePmm8                       = "pmm-8"
+	ExchangePmm9                       = "pmm-9"
+	ExchangePmm10                      = "pmm-10"
 	ExchangePolMatic                   = "pol-matic"
 	ExchangePolycat                    = "polycat"
 	ExchangePolyDex                    = "polydex"
+	ExchangePoe                        = "poe"
 	ExchangePoolParty                  = "pool-party"
 	ExchangePrimeETH                   = "primeeth"
 	ExchangePufferPufETH               = "puffer-pufeth"
@@ -237,7 +250,10 @@ const (
 	ExchangeUniSwapV3                  = "uniswapv3"
 	ExchangeUniswapV4                  = "uniswap-v4"
 	ExchangeUniswapV4Aegis             = "uniswap-v4-aegis"
+	ExchangeUniswapV4Alpha             = "uniswap-v4-alpha"
+	ExchangeUniswapV4Alphix            = "uniswap-v4-alphix"
 	ExchangeUniswapV4Angstrom          = "uniswap-v4-angstrom"
+	ExchangeUniswapV4AngstromL2        = "uniswap-v4-angstrom-l2"
 	ExchangeUniswapV4Arena             = "uniswap-v4-arena"
 	ExchangeUniswapV4Arrakis           = "uniswap-v4-arrakis"
 	ExchangeUniswapV4BunniV2           = "uniswap-v4-bunni-v2"
@@ -250,10 +266,14 @@ const (
 	ExchangeUniswapV4FairFlow          = "uniswap-v4-fairflow"
 	ExchangeUniswapV4Flaunch           = "uniswap-v4-flaunch"
 	ExchangeUniswapV4Kem               = "uniswap-v4-kem"
+	ExchangeUniswapV4Livo              = "uniswap-v4-livo"
 	ExchangeUniswapV4NftStrategy       = "uniswap-v4-nftstrat"
 	ExchangeUniswapV4Renzo             = "uniswap-v4-renzo"
+	ExchangeUniswapV4ST0x              = "uniswap-v4-st0x"
+	ExchangeUniswapV4StableStable      = "uniswap-v4-stable-stable"
 	ExchangeUniswapV4Zora              = "uniswap-v4-zora"
 	ExchangeUsd0PP                     = "usd0pp"
+	ExchangeUsdAi                      = "usd-ai"
 	ExchangeUsdsLitePsm                = "usds-lite-psm"
 	ExchangeValantisStex               = "valantis-stex"
 	ExchangeVelocoreV2CPMM             = "velocore-v2-cpmm"
@@ -274,6 +294,7 @@ const (
 	ExchangeWrappedNative              = "wrapped-native"
 	ExchangeWRSETH                     = "wrseth"
 	ExchangeXSolvBTC                   = "xsolvbtc"
+	ExchangePrintr                     = "printr"
 )
 
 var RFQSourceSet = map[Exchange]struct{}{
@@ -293,12 +314,16 @@ var RFQSourceSet = map[Exchange]struct{}{
 	ExchangePmm4:       {},
 	ExchangePmm5:       {},
 	ExchangePmm6:       {},
+	ExchangePmm7:       {},
+	ExchangePmm8:       {},
+	ExchangePmm9:       {},
+	ExchangePmm10:      {},
 	ExchangeSwaapV2:    {},
 	ExchangeUniswapLO:  {},
 }
 
-func IsRFQSource(exchange Exchange) bool {
-	_, ok := RFQSourceSet[exchange]
+func IsRFQSource[T ~string](exchange T) bool {
+	_, ok := RFQSourceSet[Exchange(exchange)]
 	return ok
 }
 
@@ -309,12 +334,28 @@ var needFallbackSourceSet = map[Exchange]struct{}{
 	ExchangeAximaV2: {},
 }
 
-func NeedsFallbackSource(exchange Exchange) bool {
-	if _, ok := needFallbackSourceSet[exchange]; ok {
+func NeedsFallbackSource[T ~string](exchange T) bool {
+	if _, ok := needFallbackSourceSet[Exchange(exchange)]; ok {
 		return true
 	}
 
 	return IsRFQSource(exchange)
+}
+
+var PropAMMSourceSet = map[Exchange]struct{}{
+	ExchangeWildcard:    {},
+	ExchangeTessera:     {},
+	ExchangeElfomofi:    {},
+	ExchangeAximaV2:     {},
+	ExchangeKipseliProp: {},
+	ExchangeWasabiProp:  {},
+	ExchangeObric:       {},
+	ExchangePoe:         {},
+}
+
+func IsPropAMMSource[T ~string](exchange T) bool {
+	_, contained := PropAMMSourceSet[Exchange(exchange)]
+	return contained
 }
 
 // SingleSwapSourceSet is a set of exchanges that
@@ -329,7 +370,7 @@ var SingleSwapSourceSet = map[Exchange]struct{}{
 	ExchangeWooFiV3:        {},
 }
 
-func IsSingleSwapSource(exchange Exchange) bool {
-	_, ok := SingleSwapSourceSet[exchange]
+func IsSingleSwapSource[T ~string](exchange T) bool {
+	_, ok := SingleSwapSourceSet[Exchange(exchange)]
 	return ok
 }

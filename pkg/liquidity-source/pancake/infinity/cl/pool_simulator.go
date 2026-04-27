@@ -13,7 +13,6 @@ import (
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/pancake/infinity/shared"
 	uniswapv3 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v3"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/source/pool"
-	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/util/eth"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
 )
 
@@ -126,7 +125,7 @@ func (p *PoolSimulator) CalcAmountOut(param pool.CalcAmountOutParams) (swapResul
 	amountIn := new(big.Int).Set(param.TokenAmountIn.Amount)
 
 	if beforeSwapResult, err = p.hook.BeforeSwap(&BeforeSwapParams{
-		ExactIn:         true,
+		CalcOut:         true,
 		ZeroForOne:      zeroForOne,
 		AmountSpecified: amountIn,
 	}); err != nil {
@@ -161,7 +160,7 @@ func (p *PoolSimulator) CalcAmountOut(param pool.CalcAmountOutParams) (swapResul
 
 	afterSwapResult, err = p.hook.AfterSwap(&AfterSwapParams{
 		BeforeSwapParams: &BeforeSwapParams{
-			ExactIn:         true,
+			CalcOut:         true,
 			ZeroForOne:      zeroForOne,
 			AmountSpecified: amountIn,
 		},
@@ -230,7 +229,7 @@ func (p *PoolSimulator) CalcAmountIn(param pool.CalcAmountInParams) (swapResult 
 	amountOut := new(big.Int).Set(param.TokenAmountOut.Amount)
 
 	if beforeSwapResult, err = p.hook.BeforeSwap(&BeforeSwapParams{
-		ExactIn:         false,
+		CalcOut:         false,
 		ZeroForOne:      zeroForOne,
 		AmountSpecified: amountOut,
 	}); err != nil {
@@ -265,7 +264,7 @@ func (p *PoolSimulator) CalcAmountIn(param pool.CalcAmountInParams) (swapResult 
 
 	if afterSwapResult, err = p.hook.AfterSwap(&AfterSwapParams{
 		BeforeSwapParams: &BeforeSwapParams{
-			ExactIn:         false,
+			CalcOut:         false,
 			ZeroForOne:      zeroForOne,
 			AmountSpecified: amountOut,
 		},
@@ -314,7 +313,7 @@ func (p *PoolSimulator) UpdateBalance(params pool.UpdateBalanceParams) {
 }
 
 func (p *PoolSimulator) GetMetaInfo(tokenIn string, tokenOut string) any {
-	tokenInAddress, tokenOutAddress := eth.AddressZero, eth.AddressZero
+	tokenInAddress, tokenOutAddress := valueobject.AddrZero, valueobject.AddrZero
 	if !p.staticExtra.IsNative[p.GetTokenIndex(tokenIn)] {
 		tokenInAddress = common.HexToAddress(tokenIn)
 	}

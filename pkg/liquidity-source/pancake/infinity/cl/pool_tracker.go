@@ -33,7 +33,6 @@ import (
 )
 
 var _ = pooltrack.RegisterFactoryCEG0(DexType, NewPoolTracker)
-var _ = pooltrack.RegisterTicksBasedFactoryCEG0(DexType, NewPoolTracker)
 
 type PoolTracker struct {
 	config        *Config
@@ -100,7 +99,7 @@ func (t *PoolTracker) FetchRPCData(ctx context.Context, p *entity.Pool, blockNum
 	return result, err
 }
 
-func (t *PoolTracker) GetNewPoolState(
+func (t *PoolTracker) BootstrapPoolState(
 	ctx context.Context,
 	p entity.Pool,
 	param poolpkg.GetNewPoolStateParams,
@@ -384,9 +383,8 @@ func transformTickRespToTick(tickResp ticklens.TickResp) (Tick, error) {
 	}, nil
 }
 
-func (t *PoolTracker) GetNewState(ctx context.Context, p entity.Pool, logs []ethtypes.Log,
-	_ map[uint64]entity.BlockHeader) (entity.Pool, error) {
-	ticksBasedPool, err := t.newTicksBasedPool(ctx, p, logs)
+func (t *PoolTracker) GetNewPoolState(ctx context.Context, p entity.Pool, param poolpkg.GetNewPoolStateParams) (entity.Pool, error) {
+	ticksBasedPool, err := t.newTicksBasedPool(ctx, p, param.Logs)
 	if err != nil {
 		logger.WithFields(logger.Fields{
 			"address":  p.Address,
@@ -547,10 +545,7 @@ func (t *PoolTracker) queryRPCTicksByIndexes(
 	totalTicks := len(tickIndexes)
 	ticks := make([]tickspkg.Tick, 0, totalTicks)
 	for i := 0; i < totalTicks; i += tickChunkSize {
-		toIdx := i + tickChunkSize
-		if toIdx > totalTicks {
-			toIdx = totalTicks
-		}
+		toIdx := min(i+tickChunkSize, totalTicks)
 
 		newTicks, err := t.queryRPCTicksByChunk(ctx, address, tickIndexes[i:toIdx], blockNumber)
 		if err != nil {
@@ -721,16 +716,7 @@ func (t *PoolTracker) updateState(ctx context.Context, p entity.Pool, ticksBased
 	p.SwapFee = float64(rpcState.SwapFee)
 	p.Extra = string(extraBytes)
 
-	var reserve0, reserve1 big.Int
-
-	// reserve0 = liquidity / sqrtPriceX96 * Q96
-	reserve0.Mul(rpcState.Liquidity, Q96)
-	reserve0.Div(&reserve0, rpcState.Slot0.SqrtPriceX96) // Already checked rpcState.Slot0.SqrtPriceX96 != 0
-
-	// reserve1 = liquidity * sqrtPriceX96 / Q96
-	reserve1.Mul(rpcState.Liquidity, rpcState.Slot0.SqrtPriceX96)
-	reserve1.Div(&reserve1, Q96)
-
+	reserve0, reserve1 := uniswapv4.EstimateReservesFromTicks(rpcState.Slot0.SqrtPriceX96, entityPoolTicks)
 	p.Reserves = entity.PoolReserves{reserve0.String(), reserve1.String()}
 	p.Timestamp = time.Now().Unix()
 

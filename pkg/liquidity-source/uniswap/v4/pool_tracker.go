@@ -29,10 +29,10 @@ import (
 	graphqlpkg "github.com/KyberNetwork/kyberswap-dex-lib/pkg/util/graphql"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/util/metrics"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/util/ticklens"
+	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
 )
 
 var _ = pooltrack.RegisterFactoryCEG0(DexType, NewPoolTracker)
-var _ = pooltrack.RegisterTicksBasedFactoryCEG0(DexType, NewPoolTracker)
 
 type PoolTracker struct {
 	config        *Config
@@ -117,7 +117,7 @@ func (t *PoolTracker) FetchRPCData(ctx context.Context, p *entity.Pool, blockNum
 	return result, err
 }
 
-func (t *PoolTracker) GetNewPoolState(
+func (t *PoolTracker) BootstrapPoolState(
 	ctx context.Context,
 	p entity.Pool,
 	param poolpkg.GetNewPoolStateParams,
@@ -221,6 +221,19 @@ func (t *PoolTracker) GetNewPoolState(
 
 	l.Infof("Finish updating state of pool")
 	return p, nil
+}
+
+func (t *PoolTracker) GetNewPoolState(ctx context.Context, p entity.Pool, param poolpkg.GetNewPoolStateParams) (entity.Pool, error) {
+	ticksBasedPool, err := t.newTicksBasedPool(ctx, p, param.Logs)
+	if err != nil {
+		logger.WithFields(logger.Fields{
+			"address":  p.Address,
+			"exchange": p.Exchange,
+		}).Error(err.Error())
+		return p, err
+	}
+
+	return t.updateState(ctx, p, ticksBasedPool, param.Logs, param.BlockHeaders)
 }
 
 // getPoolTicks
@@ -392,20 +405,6 @@ func transformTickRespToTick(tickResp ticklens.TickResp) (Tick, error) {
 	}, nil
 }
 
-func (t *PoolTracker) GetNewState(ctx context.Context, p entity.Pool, logs []ethtypes.Log,
-	blockHeaders map[uint64]entity.BlockHeader) (entity.Pool, error) {
-	ticksBasedPool, err := t.newTicksBasedPool(ctx, p, logs)
-	if err != nil {
-		logger.WithFields(logger.Fields{
-			"address":  p.Address,
-			"exchange": p.Exchange,
-		}).Error(err.Error())
-		return p, err
-	}
-
-	return t.updateState(ctx, p, ticksBasedPool, logs, blockHeaders)
-}
-
 func (t *PoolTracker) FetchPoolTicks(ctx context.Context, p entity.Pool) (entity.Pool, error) {
 	// Extract current ticks from entity pool extra
 	var extra Extra
@@ -572,7 +571,7 @@ func (t *PoolTracker) fetchTicksFromLogs(
 func (t *PoolTracker) getTickIndexesFromLogs(logs []ethtypes.Log) ([]int, error) {
 	tickSet := make(map[int]struct{})
 	for _, event := range logs {
-		if len(event.Topics) == 0 || eth.IsZeroAddress(event.Address) {
+		if len(event.Topics) == 0 || valueobject.IsZeroAddress(event.Address) {
 			continue
 		}
 
@@ -615,10 +614,7 @@ func (t *PoolTracker) queryRPCTicksByIndexes(
 	totalTicks := len(tickIndexes)
 	ticks := make([]tickspkg.Tick, 0, totalTicks)
 	for i := 0; i < totalTicks; i += tickChunkSize {
-		toIdx := i + tickChunkSize
-		if toIdx > totalTicks {
-			toIdx = totalTicks
-		}
+		toIdx := min(i+tickChunkSize, totalTicks)
 
 		newTicks, err := t.queryRPCTicksByChunk(ctx, address, tickIndexes[i:toIdx], blockNumber)
 		if err != nil {

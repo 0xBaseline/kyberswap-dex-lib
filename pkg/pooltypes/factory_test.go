@@ -16,7 +16,6 @@ import (
 func TestPoolFactory(t *testing.T) {
 	t.Parallel()
 	excludedPoolTypes := []string{
-		"ambient",       // private
 		"maverick-v2",   // private
 		"kyber-pmm",     // private
 		"pmm-1",         // private
@@ -60,7 +59,7 @@ func TestCanCalcAmountIn(t *testing.T) {
 
 func TestUseSwapLimit(t *testing.T) {
 	t.Parallel()
-	dexes := []string{"kyberswap-limit-order-v2", "ringswap"}
+	dexes := []string{"kyberswap-limit-order-v2", "ringswap", "ambient"}
 	for _, tt := range dexes {
 		t.Run(tt, func(t *testing.T) {
 			assert.Contains(t, pool.UseSwapLimit, tt)
@@ -89,7 +88,7 @@ func TestPoolListerFactory(t *testing.T) {
 		"sfrxeth-convertor", "etherfi-vampire", "algebra-integral", "virtual-fun", "beets-ss", "swap-x-v2",
 		"etherfi-ebtc", "uniswap-v4", "sky-psm", "honey", "curve-llamma", "curve-lending", "balancer-v3-eclp", "ekubo",
 		"ekubo-v3", "erc4626", "hyeth", "brownfi", "midas", "arbera-den", "cusd", "arbera-zap", "kelp-rseth-l2",
-		"valantis-stex", "nabla"}
+		"valantis-stex", "nabla", "lunarbase"}
 
 	for _, poolLister := range poolListers {
 		t.Run(poolLister, func(t *testing.T) {
@@ -119,7 +118,7 @@ func TestPoolTrackerFactory(t *testing.T) {
 		"ringswap", "generic-simple-rate", "primeeth", "staderethx", "meth", "ondo-usdy", "deltaswap-v1", "sfrxeth",
 		"sfrxeth-convertor", "etherfi-vampire", "algebra-integral", "virtual-fun", "beets-ss", "swap-x-v2",
 		"etherfi-ebtc", "uniswap-v4", "sky-psm", "honey", "curve-llamma", "curve-lending", "balancer-v3-eclp", "ekubo",
-		"ekubo-v3", "erc4626", "hyeth", "brownfi", "cusd", "kelp-rseth-l2", "valantis-stex", "nabla"}
+		"ekubo-v3", "erc4626", "hyeth", "brownfi", "cusd", "kelp-rseth-l2", "valantis-stex", "nabla", "lunarbase"}
 	t.Logf("%#v", poolTrackers)
 
 	for _, poolTracker := range poolTrackers {
@@ -139,8 +138,19 @@ func TestTicksBasedPoolTrackerFactory(t *testing.T) {
 
 	for _, poolTracker := range poolTrackers {
 		t.Run(poolTracker, func(t *testing.T) {
-			got := pooltrack.TicksBasedFactory(poolTracker)
+			got := pooltrack.Factory(poolTracker)
 			assert.NotNil(t, got)
+			handler, err := got(string(poolTracker), pooltrack.FactoryParams{
+				Exchange:   string(poolTracker),
+				Properties: nil,
+				Dependencies: pooltrack.Dependencies{
+					EthrpcClient:  nil,
+					GraphqlClient: nil,
+				},
+			})
+			assert.NoError(t, err)
+			_, ok := handler.(pool.ITicksBasedPoolTracker)
+			assert.True(t, ok)
 		})
 	}
 }

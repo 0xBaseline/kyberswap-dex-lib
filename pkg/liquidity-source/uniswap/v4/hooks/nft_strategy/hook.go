@@ -28,15 +28,13 @@ type Hook struct {
 
 var _ = uniswapv4.RegisterHooksFactory(func(param *uniswapv4.HookParam) uniswapv4.Hook {
 	hook := &Hook{Hook: &uniswapv4.BaseHook{Exchange: valueobject.ExchangeUniswapV4NftStrategy}}
-	if param.HookExtra != "" {
-		_ = json.Unmarshal([]byte(param.HookExtra), &hook)
-	}
+	_ = param.HookExtra.Unmarshal(&hook)
 	return hook
 }, HookAddresses...)
 
-func (h *Hook) Track(ctx context.Context, param *uniswapv4.HookParam) (string, error) {
-	if param.HookExtra != "" || param.HookAddress == PunkHookAddress {
-		return param.HookExtra, nil
+func (h *Hook) Track(ctx context.Context, param *uniswapv4.HookParam) (json.RawMessage, error) {
+	if param.HookExtra != nil || param.HookAddress == PunkHookAddress {
+		return json.RawMessage(param.HookExtra), nil
 	}
 
 	var deploymentBlock int64
@@ -57,21 +55,20 @@ func (h *Hook) Track(ctx context.Context, param *uniswapv4.HookParam) (string, e
 		Params: []any{true},
 	}, []any{&h.Fee}).TryBlockAndAggregate()
 	if err != nil {
-		return "{}", nil
+		return json.RawMessage("{}"), nil
 	}
 
 	if resp.BlockNumber != nil && deploymentBlock > 0 {
 		h.DeploymentTime = time.Now().Unix() - BlockTime*(resp.BlockNumber.Int64()-deploymentBlock)
 	}
-	extraBytes, _ := json.Marshal(h)
-	return string(extraBytes), nil
+	return json.Marshal(h)
 }
 
 func (h *Hook) AfterSwap(params *uniswapv4.AfterSwapParams) (*uniswapv4.AfterSwapResult, error) {
 	fee := big.NewInt(h.calculateFee(params.ZeroForOne))
 	return &uniswapv4.AfterSwapResult{
 		HookFee: bignumber.MulDivDown(fee,
-			lo.Ternary(params.ExactIn, params.AmountOut, params.AmountIn), fee, bignumber.BasisPoint),
+			lo.Ternary(params.CalcOut, params.AmountOut, params.AmountIn), fee, bignumber.BasisPoint),
 	}, nil
 }
 
