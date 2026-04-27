@@ -77,15 +77,20 @@ func (p *PoolSimulator) CalcAmountOut(param pool.CalcAmountOutParams) (*pool.Cal
 		return nil, ErrInvalidAmountOut
 	}
 
+	swapInfo := SwapInfo{
+		RelayAddress: p.extra.RelayAddress,
+		BToken:       p.Info.Address,
+		IsBuy:        isBuy,
+	}
+	if isBuy {
+		swapInfo.AmountOut = amountOut.String()
+	}
+
 	return &pool.CalcAmountOutResult{
 		TokenAmountOut: &pool.TokenAmount{Token: tokenOut, Amount: amountOut},
 		Fee:            &pool.TokenAmount{Token: tokenOut, Amount: bignumber.ZeroBI},
-		SwapInfo: SwapInfo{
-			RelayAddress: p.extra.RelayAddress,
-			BToken:       p.Info.Address,
-			IsBuy:        isBuy,
-		},
-		Gas: defaultGas,
+		SwapInfo:       swapInfo,
+		Gas:            defaultGas,
 	}, nil
 }
 

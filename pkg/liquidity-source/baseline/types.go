@@ -19,4 +19,5 @@ type SwapInfo struct {
 	RelayAddress string `json:"relayAddress"`
 	BToken       string `json:"bToken"`
 	IsBuy        bool   `json:"isBuy"`
+	AmountOut    string `json:"amountOut,omitempty"`
 }

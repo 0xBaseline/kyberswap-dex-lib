@@ -6,10 +6,8 @@ const (
 	DexType    = "baseline"
 	defaultGas = 300000
 
-	methodReserve         = "reserve"
-	methodTotalReserves   = "totalReserves"
-	methodTotalBTokens    = "totalBTokens"
-	methodTotalSupply     = "totalSupply"
+	methodTotalReserves    = "totalReserves"
+	methodTotalBTokens     = "totalBTokens"
 	methodQuoteBuyExactIn  = "quoteBuyExactIn"
 	methodQuoteSellExactIn = "quoteSellExactIn"
 )
