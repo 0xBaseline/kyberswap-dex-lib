@@ -95,12 +95,22 @@ func (p *PoolSimulator) CalcAmountOut(param pool.CalcAmountOutParams) (*pool.Cal
 		swapInfo.Fee = quote.Fee.String()
 	}
 
-	return &pool.CalcAmountOutResult{
+	result := &pool.CalcAmountOutResult{
 		TokenAmountOut: &pool.TokenAmount{Token: tokenOut, Amount: amountOut},
 		Fee:            &pool.TokenAmount{Token: p.Info.Tokens[0], Amount: quote.Fee.ToBig()},
 		SwapInfo:       swapInfo,
 		Gas:            defaultGas,
-	}, nil
+	}
+	if isBuy && quote.ReserveDelta != nil {
+		actualCost := absBI(quote.ReserveDelta)
+		if tokenAmountIn.Amount.Cmp(actualCost) > 0 {
+			result.RemainingTokenAmountIn = &pool.TokenAmount{
+				Token:  tokenAmountIn.Token,
+				Amount: subBI(tokenAmountIn.Amount, actualCost),
+			}
+		}
+	}
+	return result, nil
 }
 
 func (p *PoolSimulator) effectiveReserveLimit(tokenIndex int) *big.Int {

@@ -159,6 +159,9 @@ func lnWadBI(x *big.Int) (*big.Int, error) {
 	if x.Sign() <= 0 {
 		return nil, errInvalidCurveState
 	}
+	if x.BitLen() > 256 {
+		return nil, errInvalidCurveState
+	}
 
 	r := int64(256 - x.BitLen())
 	x96 := new(big.Int).Lsh(new(big.Int).Set(x), uint(r))

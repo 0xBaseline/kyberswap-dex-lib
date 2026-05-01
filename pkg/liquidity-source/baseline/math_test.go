@@ -1,6 +1,7 @@
 package baseline
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 
@@ -53,6 +54,20 @@ func TestLnWadBIMatchesSoladyVectors(t *testing.T) {
 			t.Fatalf("lnWadBI(%s) failed: %v", tt.x, err)
 		}
 		assertTestBIEqual(t, "lnWadBI("+tt.x+")", tt.want, got)
+	}
+}
+
+func TestLnWadBIRejectsValuesAboveInt256Domain(t *testing.T) {
+	x := new(big.Int).Lsh(big.NewInt(1), 300)
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("lnWadBI panicked: %v", r)
+		}
+	}()
+
+	if _, err := lnWadBI(x); !errors.Is(err, errInvalidCurveState) {
+		t.Fatalf("lnWadBI(1 << 300) error mismatch: want=%v got=%v", errInvalidCurveState, err)
 	}
 }
 
