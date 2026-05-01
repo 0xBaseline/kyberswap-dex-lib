@@ -34,26 +34,30 @@ func NewPoolTracker(
 }
 
 type rpcCurveParams struct {
-	BLV           *big.Int
-	Circ          *big.Int
-	Supply        *big.Int
-	SwapFee       *big.Int
-	Reserves      *big.Int
-	TotalSupply   *big.Int
-	ConvexityExp  *big.Int
-	LastInvariant *big.Int
+	BLV           *big.Int `abi:"BLV"`
+	Circ          *big.Int `abi:"circ"`
+	Supply        *big.Int `abi:"supply"`
+	SwapFee       *big.Int `abi:"swapFee"`
+	Reserves      *big.Int `abi:"reserves"`
+	TotalSupply   *big.Int `abi:"totalSupply"`
+	ConvexityExp  *big.Int `abi:"convexityExp"`
+	LastInvariant *big.Int `abi:"lastInvariant"`
 }
 
 type rpcQuoteState struct {
-	SnapshotCurveParams     rpcCurveParams
-	QuoteBlockBuyDeltaCirc  *big.Int
-	QuoteBlockSellDeltaCirc *big.Int
-	TotalSupply             *big.Int
-	TotalBTokens            *big.Int
-	TotalReserves           *big.Int
-	ReserveDecimals         uint8
-	MaxSellDelta            *big.Int
-	SnapshotActivePrice     *big.Int
+	SnapshotCurveParams     rpcCurveParams `abi:"snapshotCurveParams"`
+	QuoteBlockBuyDeltaCirc  *big.Int       `abi:"quoteBlockBuyDeltaCirc"`
+	QuoteBlockSellDeltaCirc *big.Int       `abi:"quoteBlockSellDeltaCirc"`
+	TotalSupply             *big.Int       `abi:"totalSupply"`
+	TotalBTokens            *big.Int       `abi:"totalBTokens"`
+	TotalReserves           *big.Int       `abi:"totalReserves"`
+	ReserveDecimals         uint8          `abi:"reserveDecimals"`
+	MaxSellDelta            *big.Int       `abi:"maxSellDelta"`
+	SnapshotActivePrice     *big.Int       `abi:"snapshotActivePrice"`
+}
+
+type rpcGetQuoteStateResult struct {
+	State rpcQuoteState `abi:"state_"`
 }
 
 func (s rpcQuoteState) toQuoteState() *QuoteState {
@@ -97,7 +101,7 @@ func (d *PoolTracker) GetNewPoolState(
 	// Pool address is the bToken address
 	bTokenAddr := common.HexToAddress(p.Address)
 
-	var quoteState rpcQuoteState
+	var result rpcGetQuoteStateResult
 
 	req := d.ethrpcClient.NewRequest().SetContext(ctx)
 	req.AddCall(&ethrpc.Call{
@@ -105,7 +109,7 @@ func (d *PoolTracker) GetNewPoolState(
 		Target: d.config.RelayAddress,
 		Method: methodGetQuoteState,
 		Params: []any{bTokenAddr},
-	}, []any{&quoteState})
+	}, []any{&result})
 
 	if _, err := req.TryAggregate(); err != nil {
 		logger.WithFields(logger.Fields{
@@ -118,6 +122,7 @@ func (d *PoolTracker) GetNewPoolState(
 	extra := Extra{
 		RelayAddress: d.config.RelayAddress,
 	}
+	quoteState := result.State
 	extra.QuoteState = quoteState.toQuoteState()
 
 	extraBytes, err := json.Marshal(extra)
