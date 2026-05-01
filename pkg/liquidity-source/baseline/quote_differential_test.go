@@ -27,6 +27,57 @@ type baselineDifferentialEnv struct {
 	blockNumber *big.Int
 }
 
+func TestQuoteErrorParitySelectorMapping(t *testing.T) {
+	tests := []struct {
+		name     string
+		selector string
+		wantErr  error
+	}{
+		{
+			name:     "PriceMustChange",
+			selector: "0x241b0fb3",
+			wantErr:  errPriceMustChange,
+		},
+		{
+			name:     "TradeExceedsLimit",
+			selector: "0x8a313469",
+			wantErr:  errTradeExceedsLimit,
+		},
+		{
+			name:     "SolverFailed",
+			selector: "0x308ab3c2",
+			wantErr:  errSolverFailed,
+		},
+		{
+			name:     "InvalidActivePrice",
+			selector: "0x82975b38",
+			wantErr:  errInvalidCurveState,
+		},
+		{
+			name:     "BlockPricingLib_SellExceedsSameBlockCapacity",
+			selector: "0x6d6b15dc",
+			wantErr:  errTradeExceedsLimit,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotName, gotErr, ok := quoteErrorParitySelectorMapping(
+				errors.New("execution reverted with custom error selector " + tt.selector),
+			)
+			if !ok {
+				t.Fatalf("expected selector %s to map to %s", tt.selector, tt.name)
+			}
+			if gotName != tt.name {
+				t.Fatalf("selector %s mapped to name %s, want %s", tt.selector, gotName, tt.name)
+			}
+			if !errors.Is(gotErr, tt.wantErr) {
+				t.Fatalf("selector %s mapped to error %v, want %v", tt.selector, gotErr, tt.wantErr)
+			}
+		})
+	}
+}
+
 func loadBaselineDifferentialEnv(t *testing.T) baselineDifferentialEnv {
 	t.Helper()
 
@@ -79,7 +130,13 @@ func TestBaselineQuoteDifferential_ExactIn(t *testing.T) {
 					t.Fatalf("Go quoteBuyExactIn failed: %v", err)
 				}
 				assertBigEqual(t, "tokensOut", solidity.amount, goQuote.TokenAmountOut.Amount)
-				assertBigEqual(t, "feesReceived", solidity.fee, goQuote.Fee.Amount)
+
+				optimized, optimizedErr := callQuoteBuyExactOut(t, ctx, ethrpcClient, env, solidity.amount)
+				if optimizedErr != nil {
+					t.Fatalf("Solidity quoteBuyExactOut(%s) failed: %v", solidity.amount, optimizedErr)
+				}
+				assertBigEqual(t, "feesReceived", optimized.fee, goQuote.Fee.Amount)
+				assertOptionalRemainingAmount(t, "remainingTokenAmountIn", subBI(amountIn, optimized.amount), goQuote.RemainingTokenAmountIn)
 			})
 		}
 	})
@@ -553,18 +610,83 @@ func assertBigEqual(t *testing.T, label string, expected, actual *big.Int) {
 	}
 }
 
+func assertOptionalRemainingAmount(t *testing.T, label string, expected *big.Int, actual *pool.TokenAmount) {
+	t.Helper()
+
+	if expected.Sign() == 0 {
+		if actual == nil || actual.Amount == nil || actual.Amount.Sign() == 0 {
+			return
+		}
+		t.Fatalf("%s mismatch: expected zero or nil, got %s", label, actual.Amount)
+	}
+	if actual == nil || actual.Amount == nil {
+		t.Fatalf("%s mismatch: expected %s, got nil", label, expected)
+	}
+	assertBigEqual(t, label, expected, actual.Amount)
+}
+
 func assertQuoteErrorParity(t *testing.T, method string, solidityErr, goErr error) {
 	t.Helper()
 
 	if solidityErr == nil {
 		return
 	}
-	if !strings.Contains(solidityErr.Error(), "0x241b0fb3") {
+	solidityErrorName, expectedGoErr, ok := quoteErrorParitySelectorMapping(solidityErr)
+	if !ok {
 		t.Fatalf("%s unexpected Solidity error: %v", method, solidityErr)
 	}
-	if !errors.Is(goErr, errPriceMustChange) {
-		t.Fatalf("%s Solidity reverted with PriceMustChange, but Go error was %v", method, goErr)
+	if !errors.Is(goErr, expectedGoErr) {
+		t.Fatalf("%s Solidity reverted with %s, but Go error was %v", method, solidityErrorName, goErr)
 	}
+}
+
+type quoteErrorParitySelector struct {
+	selector string
+	name     string
+	goErr    error
+}
+
+var quoteErrorParitySelectors = []quoteErrorParitySelector{
+	{
+		selector: "0x241b0fb3",
+		name:     "PriceMustChange",
+		goErr:    errPriceMustChange,
+	},
+	{
+		selector: "0x8a313469",
+		name:     "TradeExceedsLimit",
+		goErr:    errTradeExceedsLimit,
+	},
+	{
+		selector: "0x308ab3c2",
+		name:     "SolverFailed",
+		goErr:    errSolverFailed,
+	},
+	{
+		selector: "0x82975b38",
+		name:     "InvalidActivePrice",
+		goErr:    errInvalidCurveState,
+	},
+	{
+		selector: "0x6d6b15dc",
+		name:     "BlockPricingLib_SellExceedsSameBlockCapacity",
+		goErr:    errTradeExceedsLimit,
+	},
+}
+
+func quoteErrorParitySelectorMapping(solidityErr error) (string, error, bool) {
+	if solidityErr == nil {
+		return "", nil, false
+	}
+
+	errText := solidityErr.Error()
+	for _, selector := range quoteErrorParitySelectors {
+		if strings.Contains(errText, selector.selector) {
+			return selector.name, selector.goErr, true
+		}
+	}
+
+	return "", nil, false
 }
 
 func assertQuoteStateEqual(t *testing.T, expected, actual *QuoteState) {

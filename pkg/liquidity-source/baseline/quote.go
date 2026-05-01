@@ -35,7 +35,7 @@ func quoteBuyExactIn(state *QuoteState, reservesIn *big.Int) (*quoteResult, erro
 		return nil, ErrInvalidAmountIn
 	}
 
-	tokensOut, fee, accountingFee, reserveDelta, err := solveBuy(state, reservesIn)
+	tokensOut, _, accountingFee, reserveDelta, err := solveBuy(state, reservesIn)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func quoteBuyExactIn(state *QuoteState, reservesIn *big.Int) (*quoteResult, erro
 
 	return &quoteResult{
 		AmountOut:     biToU(tokensOut),
-		Fee:           biToU(fee),
+		Fee:           biToU(accountingFee),
 		AccountingFee: biToU(accountingFee),
 		ReserveDelta:  reserveDelta,
 		State:         next,
@@ -390,10 +390,14 @@ func computeSwap(params CurveParams, deltaCirc *big.Int) (userDelta, fee, invari
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	priceAfterDenominator := mulWad(x1, c1)
+	if priceAfterDenominator.Sign() == 0 {
+		return nil, nil, nil, errInvalidCurveState
+	}
 	priceAfter := addBI(uToBI(params.BLV), fullMulDiv(
 		newBuffer,
 		mulWad(uToBI(params.ConvexityExp), uToBI(params.TotalSupply)),
-		mulWad(x1, c1),
+		priceAfterDenominator,
 	))
 	if priceAfter.Cmp(priceBefore) == 0 {
 		return nil, nil, nil, errPriceMustChange
@@ -440,10 +444,14 @@ func computeZeroCircSwap(params CurveParams, deltaCirc *big.Int) (userDelta, fee
 	}
 
 	invariantDelta = subBI(uToBI(params.Reserves), addBI(newBuffer, mulWadUp(uToBI(params.BLV), deltaCirc)))
+	bufferReservesDenominator := mulWad(deltaCirc, x1)
+	if bufferReservesDenominator.Sign() == 0 {
+		return nil, nil, nil, errInvalidCurveState
+	}
 	bufferReserves := fullMulDivUp(
 		newBuffer,
 		mulWadUp(uToBI(params.ConvexityExp), uToBI(params.TotalSupply)),
-		mulWad(deltaCirc, x1),
+		bufferReservesDenominator,
 	)
 	payment := mulWadUp(deltaCirc, addBI(mulWadUp(uToBI(params.BLV), addBI(wadBI, mulBI(uToBI(params.SwapFee), twoBI))), bufferReserves))
 	return new(big.Int).Neg(payment), addBI(invariantDelta, payment), invariantDelta, nil
@@ -487,10 +495,14 @@ func computeActivePrice(params CurveParams) (*big.Int, error) {
 	if buffer.Sign() < 0 {
 		return nil, errInvalidCurveState
 	}
+	premiumDenominator := mulWad(uToBI(params.Supply), uToBI(params.Circ))
+	if premiumDenominator.Sign() == 0 {
+		return nil, errInvalidCurveState
+	}
 	premium := fullMulDiv(
 		buffer,
 		mulWad(uToBI(params.ConvexityExp), uToBI(params.TotalSupply)),
-		mulWad(uToBI(params.Supply), uToBI(params.Circ)),
+		premiumDenominator,
 	)
 	return addBI(uToBI(params.BLV), premium), nil
 }
