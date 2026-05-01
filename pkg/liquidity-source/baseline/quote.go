@@ -18,12 +18,24 @@ func (p *PoolSimulator) quoteAmountOut(isBuy bool, amountIn *big.Int) (*quoteRes
 	return quoteSellExactIn(state, amountIn)
 }
 
+func (p *PoolSimulator) quoteAmountIn(isBuy bool, amountOut *big.Int) (*quoteResult, error) {
+	if p.extra.QuoteState == nil || p.extra.QuoteState.SnapshotCurveParams.BLV == nil {
+		return nil, ErrNoRate
+	}
+
+	state := cloneQuoteState(p.extra.QuoteState)
+	if isBuy {
+		return quoteBuyExactOut(state, amountOut)
+	}
+	return quoteSellExactOut(state, amountOut)
+}
+
 func quoteBuyExactIn(state *QuoteState, reservesIn *big.Int) (*quoteResult, error) {
 	if reservesIn.Sign() <= 0 {
 		return nil, ErrInvalidAmountIn
 	}
 
-	tokensOut, fee, reserveDelta, err := solveBuy(state, reservesIn)
+	tokensOut, fee, accountingFee, reserveDelta, err := solveBuy(state, reservesIn)
 	if err != nil {
 		return nil, err
 	}
@@ -32,13 +44,14 @@ func quoteBuyExactIn(state *QuoteState, reservesIn *big.Int) (*quoteResult, erro
 	}
 
 	next := cloneQuoteState(state)
-	applyQuoteState(next, tokensOut, reserveDelta, fee)
+	applyQuoteState(next, tokensOut, reserveDelta, accountingFee)
 
 	return &quoteResult{
-		AmountOut:    biToU(tokensOut),
-		Fee:          biToU(fee),
-		ReserveDelta: reserveDelta,
-		State:        next,
+		AmountOut:     biToU(tokensOut),
+		Fee:           biToU(fee),
+		AccountingFee: biToU(accountingFee),
+		ReserveDelta:  reserveDelta,
+		State:         next,
 	}, nil
 }
 
@@ -60,30 +73,88 @@ func quoteSellExactIn(state *QuoteState, tokensIn *big.Int) (*quoteResult, error
 	applyQuoteState(next, deltaCirc, reserveDelta, fee)
 
 	return &quoteResult{
-		AmountOut:    biToU(reserveDelta),
-		Fee:          biToU(fee),
-		ReserveDelta: reserveDelta,
-		State:        next,
+		AmountOut:     biToU(reserveDelta),
+		Fee:           biToU(fee),
+		AccountingFee: biToU(fee),
+		ReserveDelta:  reserveDelta,
+		State:         next,
 	}, nil
 }
 
-func solveBuy(state *QuoteState, target *big.Int) (delta, fee, reserveDelta *big.Int, err error) {
+func quoteBuyExactOut(state *QuoteState, tokensOut *big.Int) (*quoteResult, error) {
+	if tokensOut.Sign() <= 0 {
+		return nil, ErrInvalidAmountOut
+	}
+
+	cost, fee, err := quoteBuyExactOutCost(state, tokensOut)
+	if err != nil {
+		return nil, err
+	}
+	if cost.Sign() <= 0 {
+		return nil, ErrNoRate
+	}
+
+	reserveDelta := new(big.Int).Neg(cost)
+	next := cloneQuoteState(state)
+	applyQuoteState(next, tokensOut, reserveDelta, fee)
+
+	return &quoteResult{
+		AmountOut:     biToU(cost),
+		Fee:           biToU(fee),
+		AccountingFee: biToU(fee),
+		ReserveDelta:  reserveDelta,
+		State:         next,
+	}, nil
+}
+
+func quoteSellExactOut(state *QuoteState, reservesOut *big.Int) (*quoteResult, error) {
+	if reservesOut.Sign() <= 0 {
+		return nil, ErrInvalidAmountOut
+	}
+
+	tokensIn, publicFee, err := solveSellExactOut(state, reservesOut)
+	if err != nil {
+		return nil, err
+	}
+	if tokensIn.Sign() <= 0 {
+		return nil, ErrNoRate
+	}
+
+	accountingQuote, err := quoteSellExactIn(cloneQuoteState(state), tokensIn)
+	if err != nil {
+		return nil, err
+	}
+
+	next := cloneQuoteState(state)
+	deltaCirc := new(big.Int).Neg(tokensIn)
+	applyQuoteState(next, deltaCirc, accountingQuote.ReserveDelta, accountingQuote.AccountingFee.ToBig())
+
+	return &quoteResult{
+		AmountOut:     biToU(tokensIn),
+		Fee:           biToU(publicFee),
+		AccountingFee: cloneU(accountingQuote.AccountingFee),
+		ReserveDelta:  accountingQuote.ReserveDelta,
+		State:         next,
+	}, nil
+}
+
+func solveBuy(state *QuoteState, target *big.Int) (delta, fee, accountingFee, reserveDelta *big.Int, err error) {
 	p := state.SnapshotCurveParams
 	price, err := computeActivePrice(p)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	priceWithFee := mulWad(price, addBI(wadBI, mulBI(uToBI(p.SwapFee), twoBI)))
 	if priceWithFee.Sign() == 0 {
-		return nil, nil, nil, errInvalidCurveState
+		return nil, nil, nil, nil, errInvalidCurveState
 	}
 
 	estimatedDeltaWad := mulBI(divWad(normalizeWadBI(target, state.ReserveDecimals), priceWithFee), twoBI)
 	estimatedDelta := denormalizeWadBI(estimatedDeltaWad, bTokenDecimals)
 	maxDelta := divBI(mulBI(uToBI(state.TotalBTokens), big.NewInt(99)), big.NewInt(100))
 	if maxDelta == nil || maxDelta.Sign() <= 0 {
-		return nil, nil, nil, errSolverFailed
+		return nil, nil, nil, nil, errSolverFailed
 	}
 
 	hi := estimatedDelta
@@ -121,13 +192,13 @@ func solveBuy(state *QuoteState, target *big.Int) (delta, fee, reserveDelta *big
 
 	cost, quoteFee, err := quoteBuyExactOutCost(state, delta)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if cost.Sign() == 0 || cost.Cmp(target) > 0 {
-		return nil, nil, nil, errSolverFailed
+		return nil, nil, nil, nil, errSolverFailed
 	}
 	fee = addBI(quoteFee, subBI(target, cost))
-	return delta, fee, new(big.Int).Neg(cost), nil
+	return delta, fee, quoteFee, new(big.Int).Neg(cost), nil
 }
 
 func quoteBuyExactOutCost(state *QuoteState, tokensOut *big.Int) (cost, fee *big.Int, err error) {
@@ -136,6 +207,82 @@ func quoteBuyExactOutCost(state *QuoteState, tokensOut *big.Int) (cost, fee *big
 		return nil, nil, err
 	}
 	return absBI(reserveDelta), fee, nil
+}
+
+func solveSellExactOut(state *QuoteState, targetReservesOut *big.Int) (tokensIn, fee *big.Int, err error) {
+	p := state.SnapshotCurveParams
+	price, err := computeActivePrice(p)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	priceWithFee := mulWad(price, subBI(wadBI, mulBI(uToBI(p.SwapFee), twoBI)))
+	if priceWithFee.Sign() == 0 {
+		return nil, nil, errInvalidCurveState
+	}
+
+	estimatedDeltaWad := mulBI(divWad(normalizeWadBI(targetReservesOut, state.ReserveDecimals), priceWithFee), twoBI)
+	estimatedDelta := denormalizeWadUpBI(estimatedDeltaWad, bTokenDecimals)
+	liveMaxDelta := divBI(mulBI(subBI(uToBI(state.TotalSupply), uToBI(state.TotalBTokens)), big.NewInt(99)), big.NewInt(100))
+	maxDelta := uToBI(state.MaxSellDelta)
+	if liveMaxDelta.Cmp(maxDelta) < 0 {
+		maxDelta = liveMaxDelta
+	}
+	if maxDelta.Sign() <= 0 {
+		return nil, nil, errSolverFailed
+	}
+
+	hi := estimatedDelta
+	if hi.Cmp(big.NewInt(2)) < 0 {
+		hi = big.NewInt(2)
+	}
+	if hi.Cmp(maxDelta) > 0 {
+		hi = new(big.Int).Set(maxDelta)
+	}
+
+	for hi.Cmp(maxDelta) < 0 {
+		output := quoteSellOutput(state, hi)
+		if output.Cmp(targetReservesOut) < 0 {
+			hi.Mul(hi, twoBI)
+			if hi.Cmp(maxDelta) > 0 {
+				hi.Set(maxDelta)
+			}
+			continue
+		}
+		break
+	}
+
+	if quoteSellOutput(state, hi).Cmp(targetReservesOut) < 0 {
+		return nil, nil, errSolverFailed
+	}
+
+	lo := big.NewInt(1)
+	for new(big.Int).Sub(hi, lo).Cmp(big.NewInt(1)) > 0 {
+		mid := divBI(addBI(lo, hi), twoBI)
+		midOutput := quoteSellOutput(state, mid)
+		if midOutput.Cmp(targetReservesOut) >= 0 {
+			hi = mid
+		} else {
+			lo = mid
+		}
+	}
+
+	finalQuote, err := quoteSellExactIn(cloneQuoteState(state), hi)
+	if err != nil {
+		return nil, nil, err
+	}
+	if finalQuote.AmountOut.ToBig().Cmp(targetReservesOut) < 0 {
+		return nil, nil, errSolverFailed
+	}
+	return hi, addBI(finalQuote.Fee.ToBig(), subBI(finalQuote.AmountOut.ToBig(), targetReservesOut)), nil
+}
+
+func quoteSellOutput(state *QuoteState, deltaCirc *big.Int) *big.Int {
+	quote, err := quoteSellExactIn(cloneQuoteState(state), deltaCirc)
+	if err != nil {
+		return new(big.Int)
+	}
+	return quote.AmountOut.ToBig()
 }
 
 func quoteSwap(state *QuoteState, deltaCircNative *big.Int) (deltaUserReservesNative, feesNative *big.Int, err error) {
@@ -217,7 +364,7 @@ func computeSwap(params CurveParams, deltaCirc *big.Int) (userDelta, fee, invari
 		if err := checkPowLimit(ratio, uToBI(params.ConvexityExp)); err != nil {
 			return nil, nil, nil, err
 		}
-		ratioPowN, err := powWadBI(ratio, uToBI(params.ConvexityExp), false)
+		ratioPowN, err := powWadBI(ratio, uToBI(params.ConvexityExp))
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -232,7 +379,7 @@ func computeSwap(params CurveParams, deltaCirc *big.Int) (userDelta, fee, invari
 		if err := checkPowLimit(invRatio, uToBI(params.ConvexityExp)); err != nil {
 			return nil, nil, nil, err
 		}
-		invRatioPowN, err := powWadBI(invRatio, uToBI(params.ConvexityExp), false)
+		invRatioPowN, err := powWadBI(invRatio, uToBI(params.ConvexityExp))
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -275,7 +422,7 @@ func computeZeroCircSwap(params CurveParams, deltaCirc *big.Int) (userDelta, fee
 		if err := checkPowLimit(ratio, uToBI(params.ConvexityExp)); err != nil {
 			return nil, nil, nil, err
 		}
-		ratioPowN, err := powWadBI(ratio, uToBI(params.ConvexityExp), false)
+		ratioPowN, err := powWadBI(ratio, uToBI(params.ConvexityExp))
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -285,7 +432,7 @@ func computeZeroCircSwap(params CurveParams, deltaCirc *big.Int) (userDelta, fee
 		if err := checkPowLimit(invRatio, uToBI(params.ConvexityExp)); err != nil {
 			return nil, nil, nil, err
 		}
-		invRatioPowN, err := powWadBI(invRatio, uToBI(params.ConvexityExp), false)
+		invRatioPowN, err := powWadBI(invRatio, uToBI(params.ConvexityExp))
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -357,12 +504,16 @@ func applyQuoteState(state *QuoteState, deltaCirc, reserveDelta, fee *big.Int) {
 		return
 	}
 
+	settlePendingSurplus(state)
+
+	nextTotalBTokens := subBI(uToBI(state.TotalBTokens), deltaCirc)
 	if state.TotalBTokens != nil {
-		state.TotalBTokens = biToU(subBI(uToBI(state.TotalBTokens), deltaCirc))
+		state.TotalBTokens = biToU(nextTotalBTokens)
 	}
 	if state.TotalReserves != nil {
 		state.TotalReserves = biToU(subBI(subBI(uToBI(state.TotalReserves), reserveDelta), fee))
 	}
+	recordPendingLiquidityFee(state, nextTotalBTokens, fee)
 
 	if deltaCirc.Sign() > 0 {
 		state.QuoteBlockBuyDeltaCirc = biToU(addBI(uToBI(state.QuoteBlockBuyDeltaCirc), deltaCirc))
@@ -371,6 +522,33 @@ func applyQuoteState(state *QuoteState, deltaCirc, reserveDelta, fee *big.Int) {
 	}
 	if state.MaxSellDelta != nil {
 		state.MaxSellDelta = biToU(subBI(uToBI(state.MaxSellDelta), absBI(deltaCirc)))
+	}
+}
+
+func settlePendingSurplus(state *QuoteState) {
+	if !state.SettlePendingSurplus || state.TotalReserves == nil || state.PendingSurplus == nil || state.PendingSurplus.IsZero() {
+		state.SettlePendingSurplus = false
+		return
+	}
+	bufferThreshold := mulWad(uToBI(state.TotalSupply), mustBI("950000000000000000"))
+	if uToBI(state.TotalBTokens).Cmp(bufferThreshold) < 0 {
+		state.TotalReserves = biToU(addBI(uToBI(state.TotalReserves), uToBI(state.PendingSurplus)))
+	}
+	state.PendingSurplus = uint256.NewInt(0)
+	state.SettlePendingSurplus = false
+}
+
+func recordPendingLiquidityFee(state *QuoteState, nextTotalBTokens, fee *big.Int) {
+	if fee.Sign() <= 0 || state.PendingSurplus == nil {
+		return
+	}
+	bufferThreshold := mulWad(uToBI(state.TotalSupply), mustBI("950000000000000000"))
+	if nextTotalBTokens.Cmp(bufferThreshold) >= 0 {
+		return
+	}
+	liquidityFee := mulWad(fee, uToBI(state.LiquidityFeePct))
+	if liquidityFee.Sign() > 0 {
+		state.PendingSurplus = biToU(addBI(uToBI(state.PendingSurplus), liquidityFee))
 	}
 }
 
@@ -384,6 +562,8 @@ func cloneQuoteState(state *QuoteState) *QuoteState {
 	cloned.TotalReserves = cloneU(state.TotalReserves)
 	cloned.QuoteBlockBuyDeltaCirc = cloneU(state.QuoteBlockBuyDeltaCirc)
 	cloned.QuoteBlockSellDeltaCirc = cloneU(state.QuoteBlockSellDeltaCirc)
+	cloned.LiquidityFeePct = cloneU(state.LiquidityFeePct)
+	cloned.PendingSurplus = cloneU(state.PendingSurplus)
 	cloned.MaxSellDelta = cloneU(state.MaxSellDelta)
 	cloned.SnapshotActivePrice = cloneU(state.SnapshotActivePrice)
 	cloned.SnapshotCurveParams = cloneCurveParams(state.SnapshotCurveParams)

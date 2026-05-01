@@ -75,7 +75,7 @@ func (p *PoolSimulator) CalcAmountOut(param pool.CalcAmountOutParams) (*pool.Cal
 	if amountOut.Sign() <= 0 {
 		return nil, ErrNoRate
 	}
-	if amountOut.Cmp(p.GetReserves()[tokenOutIndex]) > 0 {
+	if amountOut.Cmp(p.effectiveReserveLimit(tokenOutIndex)) > 0 {
 		return nil, ErrInvalidAmountOut
 	}
 
@@ -100,6 +100,70 @@ func (p *PoolSimulator) CalcAmountOut(param pool.CalcAmountOutParams) (*pool.Cal
 		Fee:            &pool.TokenAmount{Token: p.Info.Tokens[0], Amount: quote.Fee.ToBig()},
 		SwapInfo:       swapInfo,
 		Gas:            defaultGas,
+	}, nil
+}
+
+func (p *PoolSimulator) effectiveReserveLimit(tokenIndex int) *big.Int {
+	reserves := p.GetReserves()
+	if tokenIndex != 0 || p.extra.QuoteState == nil {
+		return reserves[tokenIndex]
+	}
+
+	state := p.extra.QuoteState
+	limit := uToBI(state.TotalReserves)
+	if state.SettlePendingSurplus && state.PendingSurplus != nil {
+		bufferThreshold := mulWad(uToBI(state.TotalSupply), mustBI("950000000000000000"))
+		if uToBI(state.TotalBTokens).Cmp(bufferThreshold) < 0 {
+			limit = addBI(limit, uToBI(state.PendingSurplus))
+		}
+	}
+	return limit
+}
+
+func (p *PoolSimulator) CalcAmountIn(param pool.CalcAmountInParams) (*pool.CalcAmountInResult, error) {
+	tokenAmountOut, tokenIn := param.TokenAmountOut, param.TokenIn
+
+	tokenInIndex := p.GetTokenIndex(tokenIn)
+	tokenOutIndex := p.GetTokenIndex(tokenAmountOut.Token)
+	if tokenInIndex < 0 || tokenOutIndex < 0 {
+		return nil, ErrInvalidToken
+	}
+	if tokenAmountOut.Amount == nil || tokenAmountOut.Amount.Sign() <= 0 {
+		return nil, ErrInvalidAmountOut
+	}
+
+	isBuy := tokenInIndex == 0
+
+	quote, err := p.quoteAmountIn(isBuy, tokenAmountOut.Amount)
+	if err != nil {
+		return nil, err
+	}
+	amountIn := quote.AmountOut.ToBig()
+	if amountIn.Sign() <= 0 {
+		return nil, ErrNoRate
+	}
+
+	swapInfo := SwapInfo{
+		RelayAddress: p.extra.RelayAddress,
+		BToken:       p.Info.Address,
+		IsBuy:        isBuy,
+		State:        quote.State,
+	}
+	if isBuy {
+		swapInfo.AmountOut = tokenAmountOut.Amount.String()
+	}
+	if quote.ReserveDelta != nil {
+		swapInfo.ReserveDelta = quote.ReserveDelta.String()
+	}
+	if quote.Fee != nil {
+		swapInfo.Fee = quote.Fee.String()
+	}
+
+	return &pool.CalcAmountInResult{
+		TokenAmountIn: &pool.TokenAmount{Token: tokenIn, Amount: amountIn},
+		Fee:           &pool.TokenAmount{Token: p.Info.Tokens[0], Amount: quote.Fee.ToBig()},
+		SwapInfo:      swapInfo,
+		Gas:           defaultGas,
 	}, nil
 }
 

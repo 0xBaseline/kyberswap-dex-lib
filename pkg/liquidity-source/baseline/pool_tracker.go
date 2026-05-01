@@ -52,6 +52,9 @@ type rpcQuoteState struct {
 	TotalBTokens            *big.Int       `abi:"totalBTokens"`
 	TotalReserves           *big.Int       `abi:"totalReserves"`
 	ReserveDecimals         uint8          `abi:"reserveDecimals"`
+	LiquidityFeePct         *big.Int       `abi:"liquidityFeePct"`
+	PendingSurplus          *big.Int       `abi:"pendingSurplus"`
+	ShouldSettlePending     bool           `abi:"shouldSettlePendingSurplus"`
 	MaxSellDelta            *big.Int       `abi:"maxSellDelta"`
 	SnapshotActivePrice     *big.Int       `abi:"snapshotActivePrice"`
 }
@@ -69,6 +72,9 @@ func (s rpcQuoteState) toQuoteState() *QuoteState {
 		TotalBTokens:            uint256.MustFromBig(nonNilBI(s.TotalBTokens)),
 		TotalReserves:           uint256.MustFromBig(nonNilBI(s.TotalReserves)),
 		ReserveDecimals:         s.ReserveDecimals,
+		LiquidityFeePct:         uint256.MustFromBig(nonNilBI(s.LiquidityFeePct)),
+		PendingSurplus:          uint256.MustFromBig(nonNilBI(s.PendingSurplus)),
+		SettlePendingSurplus:    s.ShouldSettlePending,
 		MaxSellDelta:            uint256.MustFromBig(nonNilBI(s.MaxSellDelta)),
 		SnapshotActivePrice:     uint256.MustFromBig(nonNilBI(s.SnapshotActivePrice)),
 	}

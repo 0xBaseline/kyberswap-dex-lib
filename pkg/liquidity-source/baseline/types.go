@@ -46,13 +46,17 @@ type QuoteState struct {
 	TotalBTokens            *uint256.Int `json:"tb,omitempty"`
 	TotalReserves           *uint256.Int `json:"tr,omitempty"`
 	ReserveDecimals         uint8        `json:"rd,omitempty"`
+	LiquidityFeePct         *uint256.Int `json:"lf,omitempty"`
+	PendingSurplus          *uint256.Int `json:"ps,omitempty"`
+	SettlePendingSurplus    bool         `json:"sps,omitempty"`
 	MaxSellDelta            *uint256.Int `json:"ms,omitempty"`
 	SnapshotActivePrice     *uint256.Int `json:"ap,omitempty"`
 }
 
 type quoteResult struct {
-	AmountOut    *uint256.Int
-	Fee          *uint256.Int
-	ReserveDelta *big.Int
-	State        *QuoteState
+	AmountOut     *uint256.Int
+	Fee           *uint256.Int
+	AccountingFee *uint256.Int
+	ReserveDelta  *big.Int
+	State         *QuoteState
 }
