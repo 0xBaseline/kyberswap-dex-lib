@@ -112,15 +112,14 @@ func TestPoolTracker_GetNewPoolState(t *testing.T) {
 		t.Fatalf("Failed to unmarshal extra: %v", err)
 	}
 
-	if extra.BuyRate[0] == nil || extra.BuyRate[0].IsZero() {
-		t.Fatal("BuyRate not populated")
+	if extra.QuoteState == nil {
+		t.Fatal("QuoteState not populated")
 	}
-	if extra.SellRate[0] == nil || extra.SellRate[0].IsZero() {
-		t.Fatal("SellRate not populated")
+	if extra.QuoteState.SnapshotCurveParams.BLV == nil || extra.QuoteState.SnapshotCurveParams.BLV.IsZero() {
+		t.Fatal("QuoteState snapshot BLV not populated")
 	}
 
-	t.Logf("Buy rate: %s -> %s", extra.BuyRate[0], extra.BuyRate[1])
-	t.Logf("Sell rate: %s -> %s", extra.SellRate[0], extra.SellRate[1])
+	t.Logf("Quote state: total reserves=%s total bTokens=%s", extra.QuoteState.TotalReserves, extra.QuoteState.TotalBTokens)
 }
 
 func TestCalcAmountOut_BuyPopulatesAmountOut(t *testing.T) {

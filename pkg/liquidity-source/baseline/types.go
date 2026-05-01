@@ -1,6 +1,10 @@
 package baseline
 
-import "github.com/holiman/uint256"
+import (
+	"math/big"
+
+	"github.com/holiman/uint256"
+)
 
 type Metadata struct {
 	Offset int `json:"offset"`
@@ -9,15 +13,46 @@ type Metadata struct {
 // Extra is serialized into entity.Pool.Extra
 type Extra struct {
 	RelayAddress string `json:"r"`
-	// BuyRate: [amountIn, amountOut] for reserve -> bToken (1 unit of reserve)
-	BuyRate [2]*uint256.Int `json:"b"`
-	// SellRate: [amountIn, amountOut] for bToken -> reserve (1 unit of bToken)
-	SellRate [2]*uint256.Int `json:"s"`
+
+	QuoteState *QuoteState `json:"q,omitempty"`
 }
 
 type SwapInfo struct {
-	RelayAddress string `json:"relayAddress"`
-	BToken       string `json:"bToken"`
-	IsBuy        bool   `json:"isBuy"`
-	AmountOut    string `json:"amountOut,omitempty"`
+	RelayAddress string      `json:"relayAddress"`
+	BToken       string      `json:"bToken"`
+	IsBuy        bool        `json:"isBuy"`
+	AmountOut    string      `json:"amountOut,omitempty"`
+	State        *QuoteState `json:"-"`
+	ReserveDelta string      `json:"reserveDelta,omitempty"`
+	Fee          string      `json:"fee,omitempty"`
+}
+
+type CurveParams struct {
+	BLV           *uint256.Int `json:"blv,omitempty"`
+	Circ          *uint256.Int `json:"c,omitempty"`
+	Supply        *uint256.Int `json:"x,omitempty"`
+	SwapFee       *uint256.Int `json:"sf,omitempty"`
+	Reserves      *uint256.Int `json:"y,omitempty"`
+	TotalSupply   *uint256.Int `json:"ts,omitempty"`
+	ConvexityExp  *uint256.Int `json:"n,omitempty"`
+	LastInvariant *uint256.Int `json:"k,omitempty"`
+}
+
+type QuoteState struct {
+	SnapshotCurveParams     CurveParams  `json:"s"`
+	QuoteBlockBuyDeltaCirc  *uint256.Int `json:"bb,omitempty"`
+	QuoteBlockSellDeltaCirc *uint256.Int `json:"bs,omitempty"`
+	TotalSupply             *uint256.Int `json:"ts,omitempty"`
+	TotalBTokens            *uint256.Int `json:"tb,omitempty"`
+	TotalReserves           *uint256.Int `json:"tr,omitempty"`
+	ReserveDecimals         uint8        `json:"rd,omitempty"`
+	MaxSellDelta            *uint256.Int `json:"ms,omitempty"`
+	SnapshotActivePrice     *uint256.Int `json:"ap,omitempty"`
+}
+
+type quoteResult struct {
+	AmountOut    *uint256.Int
+	Fee          *uint256.Int
+	ReserveDelta *big.Int
+	State        *QuoteState
 }

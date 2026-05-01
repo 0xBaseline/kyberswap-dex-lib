@@ -3,19 +3,21 @@ package baseline
 import "errors"
 
 const (
-	DexType    = "baseline"
-	defaultGas = 300000
+	DexType        = "baseline"
+	defaultGas     = 300000
+	bTokenDecimals = 18
 
-	methodTotalReserves    = "totalReserves"
-	methodTotalBTokens     = "totalBTokens"
-	methodQuoteBuyExactIn  = "quoteBuyExactIn"
-	methodQuoteSellExactIn = "quoteSellExactIn"
+	methodGetQuoteState     = "getQuoteState"
+	methodQuoteBuyExactIn   = "quoteBuyExactIn"
+	methodQuoteBuyExactOut  = "quoteBuyExactOut"
+	methodQuoteSellExactIn  = "quoteSellExactIn"
+	methodQuoteSellExactOut = "quoteSellExactOut"
 )
 
 var (
-	ErrInvalidToken    = errors.New("invalid token")
-	ErrInvalidAmountIn = errors.New("invalid amount in")
+	ErrInvalidToken     = errors.New("invalid token")
+	ErrInvalidAmountIn  = errors.New("invalid amount in")
 	ErrInvalidAmountOut = errors.New("invalid amount out")
-	ErrPoolNotFound    = errors.New("pool not found")
-	ErrNoRate          = errors.New("no cached rate")
+	ErrPoolNotFound     = errors.New("pool not found")
+	ErrNoRate           = errors.New("no cached rate")
 )
