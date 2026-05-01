@@ -2,6 +2,7 @@ package baseline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -16,7 +17,6 @@ import (
 
 type PoolsListUpdater struct {
 	config        *Config
-	ethrpcClient  *ethrpc.Client
 	graphqlClient *graphqlpkg.Client
 }
 
@@ -24,12 +24,11 @@ var _ = poollist.RegisterFactoryCEG(DexType, NewPoolsListUpdater)
 
 func NewPoolsListUpdater(
 	cfg *Config,
-	ethrpcClient *ethrpc.Client,
+	_ *ethrpc.Client,
 	graphqlClient *graphqlpkg.Client,
 ) *PoolsListUpdater {
 	return &PoolsListUpdater{
 		config:        cfg,
-		ethrpcClient:  ethrpcClient,
 		graphqlClient: graphqlClient,
 	}
 }
@@ -49,6 +48,10 @@ type SubgraphBToken struct {
 }
 
 func (d *PoolsListUpdater) getBTokensList(ctx context.Context, offset, limit int) ([]SubgraphBToken, error) {
+	if d.graphqlClient == nil {
+		return nil, errors.New("graphql client is not configured")
+	}
+
 	req := graphqlpkg.NewRequest(fmt.Sprintf(`{
 		bTokens(
 			filter: { chainId: "%d" }

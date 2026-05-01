@@ -62,10 +62,10 @@ func (p *PoolSimulator) CalcAmountOut(param pool.CalcAmountOutParams) (*pool.Cal
 		return nil, ErrInvalidAmountIn
 	}
 
-	// Token[0] = reserve, Token[1] = bToken
-	// reserve -> bToken = buy (tokenInIndex=0, tokenOutIndex=1)
-	// bToken -> reserve = sell (tokenInIndex=1, tokenOutIndex=0)
-	isBuy := tokenInIndex == 0
+	isBuy, err := swapDirection(tokenInIndex, tokenOutIndex)
+	if err != nil {
+		return nil, err
+	}
 
 	quote, err := p.quoteAmountOut(isBuy, tokenAmountIn.Amount)
 	if err != nil {
@@ -142,7 +142,10 @@ func (p *PoolSimulator) CalcAmountIn(param pool.CalcAmountInParams) (*pool.CalcA
 		return nil, ErrInvalidAmountOut
 	}
 
-	isBuy := tokenInIndex == 0
+	isBuy, err := swapDirection(tokenInIndex, tokenOutIndex)
+	if err != nil {
+		return nil, err
+	}
 
 	quote, err := p.quoteAmountIn(isBuy, tokenAmountOut.Amount)
 	if err != nil {
@@ -201,4 +204,16 @@ func (p *PoolSimulator) UpdateBalance(params pool.UpdateBalanceParams) {
 
 func (p *PoolSimulator) GetMetaInfo(_, _ string) any {
 	return nil
+}
+
+func swapDirection(tokenInIndex, tokenOutIndex int) (bool, error) {
+	// Token[0] = reserve, Token[1] = bToken.
+	switch {
+	case tokenInIndex == 0 && tokenOutIndex == 1:
+		return true, nil
+	case tokenInIndex == 1 && tokenOutIndex == 0:
+		return false, nil
+	default:
+		return false, ErrInvalidToken
+	}
 }

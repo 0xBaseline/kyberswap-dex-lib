@@ -1,6 +1,7 @@
 package baseline
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 
@@ -38,6 +39,46 @@ func TestCalcAmountOut_BuyExactInReportsOptimizedExecutionFee(t *testing.T) {
 	}
 	if result.RemainingTokenAmountIn.Amount.Cmp(dust) != 0 {
 		t.Fatalf("remaining input mismatch: want %s got %s", dust, result.RemainingTokenAmountIn.Amount)
+	}
+}
+
+func TestCalcAmountOutRejectsSameTokenDirection(t *testing.T) {
+	sim := newBaselineQuoteTestSimulator(t, newBaselineQuoteTestState())
+
+	_, err := sim.CalcAmountOut(pool.CalcAmountOutParams{
+		TokenAmountIn: pool.TokenAmount{Token: testReserveToken, Amount: big.NewInt(1)},
+		TokenOut:      testReserveToken,
+	})
+	if !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("expected ErrInvalidToken for reserve->reserve quote, got %v", err)
+	}
+
+	_, err = sim.CalcAmountOut(pool.CalcAmountOutParams{
+		TokenAmountIn: pool.TokenAmount{Token: testBToken, Amount: big.NewInt(1)},
+		TokenOut:      testBToken,
+	})
+	if !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("expected ErrInvalidToken for bToken->bToken quote, got %v", err)
+	}
+}
+
+func TestCalcAmountInRejectsSameTokenDirection(t *testing.T) {
+	sim := newBaselineQuoteTestSimulator(t, newBaselineQuoteTestState())
+
+	_, err := sim.CalcAmountIn(pool.CalcAmountInParams{
+		TokenAmountOut: pool.TokenAmount{Token: testReserveToken, Amount: big.NewInt(1)},
+		TokenIn:        testReserveToken,
+	})
+	if !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("expected ErrInvalidToken for reserve->reserve quote, got %v", err)
+	}
+
+	_, err = sim.CalcAmountIn(pool.CalcAmountInParams{
+		TokenAmountOut: pool.TokenAmount{Token: testBToken, Amount: big.NewInt(1)},
+		TokenIn:        testBToken,
+	})
+	if !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("expected ErrInvalidToken for bToken->bToken quote, got %v", err)
 	}
 }
 
