@@ -20,6 +20,7 @@ import (
 	balancerv3weighted "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/balancer/v3/weighted"
 	bancorv21 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/bancor-v21"
 	bancorv3 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/bancor-v3"
+	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/baseline"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/bedrock/unibtc"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/bedrock/unieth"
 	beetsss "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/beets-ss"
@@ -335,6 +336,7 @@ type Types struct {
 	FluidDexLite               string
 	MantleETH                  string
 	OndoUSDY                   string
+	Baseline                   string
 	Clear                      string
 	Clipper                    string
 	DeltaSwapV1                string
@@ -546,6 +548,7 @@ var (
 		FluidDexLite:               fluidDexLite.DexType,
 		MantleETH:                  meth.DexType,
 		OndoUSDY:                   ondousdy.DexType,
+		Baseline:                   baseline.DexType,
 		Clear:                      clear.DexType,
 		Clipper:                    clipper.DexType,
 		DeltaSwapV1:                deltaswapv1.DexType,
