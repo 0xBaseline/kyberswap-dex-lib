@@ -209,6 +209,7 @@ func (p *PoolSimulator) GetMetaInfo(tokenIn, tokenOut string) any {
 
 	return PoolMeta{
 		Pool:        p.extra.RelayAddress,
+		BToken:      p.Info.Address,
 		IsBuyBase:   isBuy,
 		BlockNumber: p.Info.BlockNumber,
 	}

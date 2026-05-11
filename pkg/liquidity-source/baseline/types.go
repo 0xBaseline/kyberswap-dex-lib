@@ -63,6 +63,7 @@ type quoteResult struct {
 
 type PoolMeta struct {
 	Pool        string `json:"p"`
+	BToken      string `json:"bToken,omitempty"`
 	BlockNumber uint64 `json:"bN"`
 	IsBuyBase   bool   `json:"isBuyBase,omitempty"`
 }

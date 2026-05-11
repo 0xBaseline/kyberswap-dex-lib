@@ -15,6 +15,7 @@ import (
 const (
 	testReserveToken = "0x0000000000000000000000000000000000000001"
 	testBToken       = "0x0000000000000000000000000000000000000002"
+	testRelay        = "0x0000000000000000000000000000000000000003"
 )
 
 func TestCalcAmountOut_BuyExactInReportsOptimizedExecutionFee(t *testing.T) {
@@ -39,6 +40,51 @@ func TestCalcAmountOut_BuyExactInReportsOptimizedExecutionFee(t *testing.T) {
 	}
 	if result.RemainingTokenAmountIn.Amount.Cmp(dust) != 0 {
 		t.Fatalf("remaining input mismatch: want %s got %s", dust, result.RemainingTokenAmountIn.Amount)
+	}
+}
+
+func TestBuyRouteExposesOptimizedAdapterInputs(t *testing.T) {
+	sim := newBaselineQuoteTestSimulator(t, newBaselineQuoteTestState())
+	amountIn := mustTestBI(t, "1000000000000000000")
+
+	result, err := sim.CalcAmountOut(pool.CalcAmountOutParams{
+		TokenAmountIn: pool.TokenAmount{Token: testReserveToken, Amount: amountIn},
+		TokenOut:      testBToken,
+	})
+	if err != nil {
+		t.Fatalf("CalcAmountOut buy failed: %v", err)
+	}
+
+	metaInfo := sim.GetMetaInfo(testReserveToken, testBToken)
+	meta, ok := metaInfo.(PoolMeta)
+	if !ok {
+		t.Fatalf("GetMetaInfo returned %T, want PoolMeta", metaInfo)
+	}
+	if meta.Pool != testRelay {
+		t.Fatalf("PoolMeta.Pool = %s, want relay %s", meta.Pool, testRelay)
+	}
+	if meta.BToken != testBToken {
+		t.Fatalf("PoolMeta.BToken = %s, want %s", meta.BToken, testBToken)
+	}
+	if !meta.IsBuyBase {
+		t.Fatal("PoolMeta.IsBuyBase must be true for reserve -> bToken")
+	}
+
+	swapInfo, ok := result.SwapInfo.(SwapInfo)
+	if !ok {
+		t.Fatalf("SwapInfo is %T, want baseline.SwapInfo", result.SwapInfo)
+	}
+	if swapInfo.RelayAddress != testRelay {
+		t.Fatalf("SwapInfo.RelayAddress = %s, want %s", swapInfo.RelayAddress, testRelay)
+	}
+	if swapInfo.BToken != testBToken {
+		t.Fatalf("SwapInfo.BToken = %s, want %s", swapInfo.BToken, testBToken)
+	}
+	if !swapInfo.IsBuy {
+		t.Fatal("SwapInfo.IsBuy must be true for reserve -> bToken")
+	}
+	if swapInfo.AmountOut != result.TokenAmountOut.Amount.String() {
+		t.Fatalf("SwapInfo.AmountOut = %s, want TokenAmountOut %s", swapInfo.AmountOut, result.TokenAmountOut.Amount)
 	}
 }
 
@@ -139,7 +185,7 @@ func quoteBuyExactInWithDust(
 func newBaselineQuoteTestSimulator(t *testing.T, state *QuoteState) *PoolSimulator {
 	t.Helper()
 
-	extra, err := json.Marshal(Extra{QuoteState: state})
+	extra, err := json.Marshal(Extra{RelayAddress: testRelay, QuoteState: state})
 	if err != nil {
 		t.Fatalf("marshal extra: %v", err)
 	}
